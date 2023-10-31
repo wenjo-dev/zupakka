@@ -4,9 +4,9 @@
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>ddm.de</groupId>
-	<artifactId>ddm-akka</artifactId>
-	<name>ddm-akka</name>
-	<version>1.0</version>
+	<artifactId>zupakka</artifactId>
+	<name>zupakka</name>
+	<version>0.1</version>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -15,7 +15,7 @@
 		<logback.version>1.2.3</logback.version>
 		<junit.version>4.13.2</junit.version>
 		<chill-akka.version>0.10.0</chill-akka.version>
-		<lombok.version>1.18.20</lombok.version>
+		<lombok.version>1.18.30</lombok.version>
 		<jcommander.version>1.81</jcommander.version>
 		<fastutil.version>8.5.5</fastutil.version>
 		<opencsv.version>5.5.2</opencsv.version>
@@ -98,6 +98,7 @@
 
 	<build>
 		<plugins>
+		<!--
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
@@ -111,6 +112,7 @@
 					<compilerArgument>-Xlint:all</compilerArgument>
 				</configuration>
 			</plugin>
+		-->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>

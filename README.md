@@ -1,5 +1,11 @@
-# ddm-akka
-Akka example and homework code for the "Big Data Systems" lecture.
+# zupakka
+
+a fork of **ddm-akka**
+
+group:
+- Daniel Engelbach
+- Jonathan Wendt
+- Desirée Wenk
 
 ## Requirements
 - Java 9 >=
