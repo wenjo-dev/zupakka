@@ -42,6 +42,15 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		int task;
 	}
 
+	@Getter
+	@NoArgsConstructor
+	@AllArgsConstructor
+	public static class InitWorkerMessage implements Message {
+		private static final long serialVersionUID = -4667745203456218160L;
+		ActorRef<LargeMessageProxy.Message> dependencyMinerLargeMessageProxy;
+		int workerId;
+	}
+
 	////////////////////////
 	// Actor Construction //
 	////////////////////////
@@ -54,10 +63,8 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 
 	private DependencyWorker(ActorContext<Message> context) {
 		super(context);
-
 		final ActorRef<Receptionist.Listing> listingResponseAdapter = context.messageAdapter(Receptionist.Listing.class, ReceptionistListingMessage::new);
 		context.getSystem().receptionist().tell(Receptionist.subscribe(DependencyMiner.dependencyMinerService, listingResponseAdapter));
-
 		this.largeMessageProxy = this.getContext().spawn(LargeMessageProxy.create(this.getContext().getSelf().unsafeUpcast()), LargeMessageProxy.DEFAULT_NAME);
 	}
 
@@ -76,6 +83,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		return newReceiveBuilder()
 				.onMessage(ReceptionistListingMessage.class, this::handle)
 				.onMessage(TaskMessage.class, this::handle)
+				.onMessage(InitWorkerMessage.class, this::handle)
 				.build();
 	}
 
@@ -87,7 +95,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	}
 
 	private Behavior<Message> handle(TaskMessage message) {
-		this.getContext().getLog().info("Working!");
+		this.getContext().getLog().info("Working! on " + message.getTask());
 		// I should probably know how to solve this task, but for now I just pretend some work...
 
 		int result = message.getTask();
@@ -100,6 +108,11 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		LargeMessageProxy.LargeMessage completionMessage = new DependencyMiner.CompletionMessage(this.getContext().getSelf(), result);
 		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(completionMessage, message.getDependencyMinerLargeMessageProxy()));
 
+		return this;
+	}
+
+	private Behavior<Message> handle(InitWorkerMessage message) {
+		this.getContext().getLog().info("Initializing Worker " + message.getWorkerId());
 		return this;
 	}
 }
