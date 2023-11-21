@@ -4,8 +4,8 @@
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>ddm.de</groupId>
-	<artifactId>zupakka</artifactId>
-	<name>zupakka</name>
+	<artifactId>ddm-akka</artifactId>
+	<name>ddm-akka</name>
 	<version>0.1</version>
 
 	<properties>
