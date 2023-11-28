@@ -72,6 +72,13 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		int result;
 	}
 
+	@Getter
+	@NoArgsConstructor
+	@AllArgsConstructor
+	public static class TaskRequestMessage implements Message {
+		private static final long serialVersionUID = -7242425159675583598L;
+		ActorRef<DependencyWorker.Message> dependencyWorker;
+	}
 	////////////////////////
 	// Actor Construction //
 	////////////////////////
@@ -129,6 +136,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 				.onMessage(HeaderMessage.class, this::handle)
 				.onMessage(RegistrationMessage.class, this::handle)
 				.onMessage(CompletionMessage.class, this::handle)
+				.onMessage(TaskRequestMessage.class, this::handle)
 				.onSignal(Terminated.class, this::handle)
 				.build();
 	}
@@ -147,8 +155,6 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		return this;
 	}
 
-
-	// TODO: Assing columns to worker
 	private Behavior<Message> handle(BatchMessage message) {
 		if (DataManager.fileContents[0] == null){
 			for (int i = 0; i < 7; i++) {
@@ -158,6 +164,9 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		if (!message.getBatch().isEmpty()){
 			this.inputReaders.get(message.getId()).tell(new InputReader.ReadBatchMessage(this.getContext().getSelf()));
 			DataManager.fileContents[message.getId()].addAll(message.getBatch());
+		} else {
+			this.getContext().getLog().info("TABLE " + message.getId() + " finished with: " + DataManager.fileContents[message.getId()].size());
+			DataManager.currentTask = DataManager.CurrentTask.CreateColumns;
 		}
 		return this;
 	}
@@ -167,8 +176,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		if (!this.dependencyWorkers.contains(dependencyWorker)) {
 			this.dependencyWorkers.add(dependencyWorker);
 			this.getContext().watch(dependencyWorker);
-			//dependencyWorker.tell(new DependencyWorker.InitWorkerMessage(this.largeMessageProxy , this.dependencyWorkers.size()));
-			DataManager.availableWorkers.add(message.getDependencyWorker());
+			dependencyWorker.tell(new DependencyWorker.IdleStateMessage(this.largeMessageProxy));
 		}
 		return this;
 	}
@@ -195,12 +203,30 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		// Once I found all unary INDs, I could check if this.discoverNaryDependencies is set to true and try to detect n-ary INDs as well!
 
 		//dependencyWorker.tell(new DependencyWorker.TaskMessage(this.largeMessageProxy, 42));
-		dependencyWorker.tell(new DependencyWorker.TaskMessage(this.largeMessageProxy, message.getResult()));
-
+		dependencyWorker.tell(new DependencyWorker.TaskMessage(this.largeMessageProxy, 0));
 
 		// At some point, I am done with the discovery. That is when I should call my end method. Because I do not work on a completable task yet, I simply call it after some time.
 		if (System.currentTimeMillis() - this.startTime > 2000000)
 			this.end();
+		return this;
+	}
+
+	private Behavior<Message> handle(TaskRequestMessage message) {
+		ActorRef<DependencyWorker.Message> dependencyWorker = message.getDependencyWorker();
+
+		switch(DataManager.currentTask){
+			case ReadData:
+				dependencyWorker.tell(new DependencyWorker.IdleStateMessage(this.largeMessageProxy));
+				break;
+			case CreateColumns: // TODO: SELECT TABLE AS DATA
+				dependencyWorker.tell(new DependencyWorker.RowToColumnMessage(this.largeMessageProxy, null));
+				break;
+			case CreateUniqueLists:
+				break;
+			case FindUnaryINDS:
+				break;
+		}
+
 		return this;
 	}
 

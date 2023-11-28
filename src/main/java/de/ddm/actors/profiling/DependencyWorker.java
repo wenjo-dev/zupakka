@@ -13,6 +13,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
@@ -45,10 +47,18 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	@Getter
 	@NoArgsConstructor
 	@AllArgsConstructor
-	public static class InitWorkerMessage implements Message {
+	public static class IdleStateMessage implements Message {
 		private static final long serialVersionUID = -4667745203456218160L;
 		ActorRef<LargeMessageProxy.Message> dependencyMinerLargeMessageProxy;
-		int workerId;
+	}
+
+	@Getter
+	@NoArgsConstructor
+	@AllArgsConstructor
+	public static class RowToColumnMessage implements Message {
+		private static final long serialVersionUID = -4667743782456218160L;
+		ActorRef<LargeMessageProxy.Message> dependencyMinerLargeMessageProxy;
+		List<String[]> data;
 	}
 
 	////////////////////////
@@ -83,7 +93,8 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		return newReceiveBuilder()
 				.onMessage(ReceptionistListingMessage.class, this::handle)
 				.onMessage(TaskMessage.class, this::handle)
-				.onMessage(InitWorkerMessage.class, this::handle)
+				.onMessage(IdleStateMessage.class, this::handle)
+				.onMessage(RowToColumnMessage.class, this::handle)
 				.build();
 	}
 
@@ -94,11 +105,12 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		return this;
 	}
 
+
 	private Behavior<Message> handle(TaskMessage message) {
 		this.getContext().getLog().info("Working on " + message.getTask());
 		// I should probably know how to solve this task, but for now I just pretend some work...
 
-		int result = message.getTask();
+		int result = 1;
 		long time = System.currentTimeMillis();
 		Random rand = new Random();
 		int runtime = (rand.nextInt(2) + 2) * 1000;
@@ -111,10 +123,22 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		return this;
 	}
 
-	private Behavior<Message> handle(InitWorkerMessage message) {
-		this.getContext().getLog().info("Initializing Worker " + message.getWorkerId());
-		LargeMessageProxy.LargeMessage completionMessage = new DependencyMiner.CompletionMessage(this.getContext().getSelf(), -1);
-		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(completionMessage, message.getDependencyMinerLargeMessageProxy()));
+	private Behavior<Message> handle(IdleStateMessage message) {
+		this.getContext().getLog().info("Checking for Work..");
+		LargeMessageProxy.LargeMessage taskRequestMsg = new DependencyMiner.TaskRequestMessage(this.getContext().getSelf());
+		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(taskRequestMsg, message.getDependencyMinerLargeMessageProxy()));
+		return this;
+	}
+
+	// TODO: GET COLUMNS
+	private Behavior<Message> handle(RowToColumnMessage message){
+
+		for (int i = 0; i < message.getData().size(); i++){
+			for (int j = 0; j < message.getData().get(i).length; j++){
+
+			}
+		}
+
 		return this;
 	}
 }
