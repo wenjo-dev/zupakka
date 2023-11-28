@@ -95,6 +95,7 @@ public class InputReader extends AbstractBehavior<InputReader.Message> {
 
 	private Behavior<Message> handle(ReadBatchMessage message) throws IOException, CsvValidationException {
 		List<String[]> batch = new ArrayList<>(this.batchSize);
+
 		for (int i = 0; i < this.batchSize; i++) {
 			String[] line = this.reader.readNext();
 			if (line == null)

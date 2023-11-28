@@ -95,11 +95,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	}
 
 	private Behavior<Message> handle(TaskMessage message) {
-		if (message.getTask() == -1){
-			this.getContext().getLog().info("Successfully initialized worker! Entering Idle State");
-		} else {
-			this.getContext().getLog().info("Working on " + message.getTask());
-		}
+		this.getContext().getLog().info("Working on " + message.getTask());
 		// I should probably know how to solve this task, but for now I just pretend some work...
 
 		int result = message.getTask();

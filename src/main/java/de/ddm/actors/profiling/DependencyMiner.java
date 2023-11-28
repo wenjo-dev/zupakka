@@ -147,11 +147,18 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		return this;
 	}
 
-	private Behavior<Message> handle(BatchMessage message) {
-		// Ignoring batch content for now ... but I could do so much with it.
-		if (message.getBatch().size() != 0)
-			this.inputReaders.get(message.getId()).tell(new InputReader.ReadBatchMessage(this.getContext().getSelf()));
 
+	// TODO: Assing columns to worker
+	private Behavior<Message> handle(BatchMessage message) {
+		if (DataManager.fileContents[0] == null){
+			for (int i = 0; i < 7; i++) {
+				DataManager.fileContents[i] = new ArrayList<>();
+			}
+		}
+		if (!message.getBatch().isEmpty()){
+			this.inputReaders.get(message.getId()).tell(new InputReader.ReadBatchMessage(this.getContext().getSelf()));
+			DataManager.fileContents[message.getId()].addAll(message.getBatch());
+		}
 		return this;
 	}
 
@@ -160,7 +167,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		if (!this.dependencyWorkers.contains(dependencyWorker)) {
 			this.dependencyWorkers.add(dependencyWorker);
 			this.getContext().watch(dependencyWorker);
-			dependencyWorker.tell(new DependencyWorker.InitWorkerMessage(this.largeMessageProxy , this.dependencyWorkers.size()));
+			//dependencyWorker.tell(new DependencyWorker.InitWorkerMessage(this.largeMessageProxy , this.dependencyWorkers.size()));
+			DataManager.availableWorkers.add(message.getDependencyWorker());
 		}
 		return this;
 	}
