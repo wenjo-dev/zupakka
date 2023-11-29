@@ -10,6 +10,8 @@ import akka.actor.typed.javadsl.Receive;
 import akka.actor.typed.receptionist.Receptionist;
 import akka.actor.typed.receptionist.ServiceKey;
 import de.ddm.actors.patterns.LargeMessageProxy;
+import de.ddm.actors.profiling.tasks.DataManager;
+import de.ddm.actors.profiling.tasks.UniqueColumnTask;
 import de.ddm.serialization.AkkaSerializable;
 import de.ddm.singletons.InputConfigurationSingleton;
 import de.ddm.singletons.SystemConfigurationSingleton;
@@ -79,6 +81,17 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		private static final long serialVersionUID = -7242425159675583598L;
 		ActorRef<DependencyWorker.Message> dependencyWorker;
 	}
+
+	@Getter
+	@NoArgsConstructor
+	@AllArgsConstructor
+	public static class UniqueColumnTaskCompletedMessage implements Message {
+		private static final long serialVersionUID = -7242425159675581998L;
+		ActorRef<DependencyWorker.Message> dependencyWorker;
+		ArrayList<String> data;
+		int tableIndex;
+		int columnIndex;
+	}
 	////////////////////////
 	// Actor Construction //
 	////////////////////////
@@ -137,6 +150,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 				.onMessage(RegistrationMessage.class, this::handle)
 				.onMessage(CompletionMessage.class, this::handle)
 				.onMessage(TaskRequestMessage.class, this::handle)
+				.onMessage(UniqueColumnTaskCompletedMessage.class, this::handle)
 				.onSignal(Terminated.class, this::handle)
 				.build();
 	}
@@ -165,8 +179,9 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			this.inputReaders.get(message.getId()).tell(new InputReader.ReadBatchMessage(this.getContext().getSelf()));
 			DataManager.fileContents[message.getId()].addAll(message.getBatch());
 		} else {
-			this.getContext().getLog().info("TABLE " + message.getId() + " finished with: " + DataManager.fileContents[message.getId()].size());
-			DataManager.currentTask = DataManager.CurrentTask.CreateColumns;
+			this.getContext().getLog().info("Reading Data from TABLE " + message.getId() + ". Found " + DataManager.fileContents[message.getId()].size() + " Entries.");
+			UniqueColumnTask.createUniqueColumnTasks(DataManager.fileContents[message.getId()], message.getId());
+			DataManager.currentTask = DataManager.CurrentTask.RemoveDuplicates;
 		}
 		return this;
 	}
@@ -213,20 +228,28 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 	private Behavior<Message> handle(TaskRequestMessage message) {
 		ActorRef<DependencyWorker.Message> dependencyWorker = message.getDependencyWorker();
-
 		switch(DataManager.currentTask){
 			case ReadData:
 				dependencyWorker.tell(new DependencyWorker.IdleStateMessage(this.largeMessageProxy));
 				break;
-			case CreateColumns: // TODO: SELECT TABLE AS DATA
-				dependencyWorker.tell(new DependencyWorker.RowToColumnMessage(this.largeMessageProxy, null));
-				break;
-			case CreateUniqueLists:
+			case RemoveDuplicates:
+				if(!DataManager.workTasks.isEmpty()){
+					this.getContext().getLog().info("Sending Data to worker to create unique columns..");
+					dependencyWorker.tell(new DependencyWorker.RemoveDuplicatesMessage(this.largeMessageProxy,
+                            (UniqueColumnTask) DataManager.workTasks.get(0)));
+					DataManager.workTasks.remove(0);
+				}
 				break;
 			case FindUnaryINDS:
 				break;
 		}
 
+		return this;
+	}
+
+	private Behavior<Message> handle(UniqueColumnTaskCompletedMessage message) {
+		ActorRef<DependencyWorker.Message> dependencyWorker = message.getDependencyWorker();
+		this.getContext().getLog().info("RECEIVED FROM TABLE: " + message.getTableIndex());
 		return this;
 	}
 

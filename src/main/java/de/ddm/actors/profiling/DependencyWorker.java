@@ -8,15 +8,13 @@ import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 import akka.actor.typed.receptionist.Receptionist;
 import de.ddm.actors.patterns.LargeMessageProxy;
+import de.ddm.actors.profiling.tasks.UniqueColumnTask;
 import de.ddm.serialization.AkkaSerializable;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 
 public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message> {
 
@@ -55,10 +53,10 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	@Getter
 	@NoArgsConstructor
 	@AllArgsConstructor
-	public static class RowToColumnMessage implements Message {
+	public static class RemoveDuplicatesMessage implements Message {
 		private static final long serialVersionUID = -4667743782456218160L;
 		ActorRef<LargeMessageProxy.Message> dependencyMinerLargeMessageProxy;
-		List<String[]> data;
+		UniqueColumnTask task;
 	}
 
 	////////////////////////
@@ -94,7 +92,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 				.onMessage(ReceptionistListingMessage.class, this::handle)
 				.onMessage(TaskMessage.class, this::handle)
 				.onMessage(IdleStateMessage.class, this::handle)
-				.onMessage(RowToColumnMessage.class, this::handle)
+				.onMessage(RemoveDuplicatesMessage.class, this::handle)
 				.build();
 	}
 
@@ -130,15 +128,21 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		return this;
 	}
 
-	// TODO: GET COLUMNS
-	private Behavior<Message> handle(RowToColumnMessage message){
-
-		for (int i = 0; i < message.getData().size(); i++){
-			for (int j = 0; j < message.getData().get(i).length; j++){
-
-			}
-		}
-
+	private Behavior<Message> handle(RemoveDuplicatesMessage message){
+		this.getContext().getLog().info("Removing duplicates in table " + message.getTask().getTableIndex() + " column " + message.getTask().getColumnIndex());
+		ArrayList<String> result = new ArrayList<>();
+		String[] data = message.task.getData();
+        for (String val : data) {
+            if (!result.contains(val)) {
+                result.add(val);
+            }
+        }
+		this.getContext().getLog().info("Process finished. Sending results back to master..");
+		LargeMessageProxy.LargeMessage taskFinishedMsg = new DependencyMiner.UniqueColumnTaskCompletedMessage(this.getContext().getSelf(), result, message.getTask().getTableIndex(), message.getTask().getColumnIndex());
+		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(taskFinishedMsg, message.getDependencyMinerLargeMessageProxy()));
+		// Request more work..
+		LargeMessageProxy.LargeMessage taskRequestMsg = new DependencyMiner.TaskRequestMessage(this.getContext().getSelf());
+		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(taskRequestMsg, message.getDependencyMinerLargeMessageProxy()));
 		return this;
 	}
 }
