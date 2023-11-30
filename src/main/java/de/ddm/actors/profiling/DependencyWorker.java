@@ -38,10 +38,10 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	@Getter
 	@NoArgsConstructor
 	@AllArgsConstructor
-	public static class TaskMessage implements Message {
+	public static class UniqueColumnTaskMessage implements Message {
 		private static final long serialVersionUID = -4667745204456518160L;
 		ActorRef<LargeMessageProxy.Message> dependencyMinerLargeMessageProxy;
-		WorkTask task;
+		UniqueColumnTask task;
 	}
 
 	////////////////////////
@@ -77,7 +77,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	public Receive<Message> createReceive() {
 		return newReceiveBuilder()
 				.onMessage(ReceptionistListingMessage.class, this::handle)
-				.onMessage(TaskMessage.class, this::handle)
+				.onMessage(UniqueColumnTaskMessage.class, this::handle)
 				.build();
 	}
 
@@ -88,13 +88,14 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		return this;
 	}
 
-	private Behavior<Message> handle(TaskMessage message) {
-		if (message.getTask().getClass().equals(UniqueColumnTask.class)){
-			ActorRef<UniqueColumnCreator.Message> actor = getContext().spawn(UniqueColumnCreator.create((UniqueColumnTask) message.getTask()),
-					UniqueColumnCreator.DEFAULT_NAME + "_" + ((UniqueColumnTask) message.getTask()).getTableIndex()
-							+ ";" + ((UniqueColumnTask) message.getTask()).getColumnIndex());
-			actor.tell(new UniqueColumnCreator.CreateUniqueColumnMessage(this.largeMessageProxy, this.getContext().getSelf()));
-		}
+	private Behavior<Message> handle(UniqueColumnTaskMessage message) {
+		this.getContext().getLog().info("Received " + message.getTask().getClass() + " for " +  (message.getTask()).getData().length + " entries.");
+		this.getContext().getLog().info("Spawning Actor to create unique columns..");
+		ActorRef<UniqueColumnCreator.Message> actor = getContext().spawn(UniqueColumnCreator.create(message.getTask()),
+				UniqueColumnCreator.DEFAULT_NAME + "_" + (message.getTask()).getTableIndex()
+						+ ";" + (message.getTask()).getColumnIndex());
+		actor.tell(new UniqueColumnCreator.CreateUniqueColumnMessage(this.largeMessageProxy, this.getContext().getSelf()));
+
 
 		//LargeMessageProxy.LargeMessage completionMessage = new DependencyMiner.CompletionMessage(this.getContext().getSelf(), result);
 		//this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(completionMessage, message.getDependencyMinerLargeMessageProxy()));

@@ -195,12 +195,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			this.idleWorkers.add(dependencyWorker);
 			return this;
 		}
-
-		WorkTask task = this.workList.get(0);
-		this.workList.remove(0);
-		this.busyWorkers.add(dependencyWorker);
-		dependencyWorker.tell(new DependencyWorker.TaskMessage(this.largeMessageProxy, task));
-
+		assignTasksToWorkers();
 		return this;
 	}
 
@@ -236,6 +231,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	private Behavior<Message> handle(ColumnCreationMessage message) {
 		this.getContext().getLog().info("Received " + message.taskList.size() + " columns from table " + message.taskList.get(0).getTableIndex());
 		this.columnCreators.remove(message.columnCreator);
+		this.workList.addAll(message.getTaskList());
 		assignTasksToWorkers();
 		return this;
 	}
@@ -263,8 +259,10 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			ActorRef<DependencyWorker.Message> worker = this.idleWorkers.get(0);
 			this.idleWorkers.remove(0);
 			this.busyWorkers.add(worker);
-			worker.tell(new DependencyWorker.TaskMessage(this.largeMessageProxy, task));
-			this.getContext().getLog().info("Assigning " + task.getClass() + " to worker.");
+			if(task.getClass().equals(UniqueColumnTask.class)){
+				worker.tell(new DependencyWorker.UniqueColumnTaskMessage(this.largeMessageProxy, ((UniqueColumnTask)task)));
+				this.getContext().getLog().info("Assigning " + task.getClass() + " to worker.");
+			}
 		}
 	}
 }
