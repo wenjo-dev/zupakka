@@ -1,5 +1,6 @@
 package de.ddm.actors.profiling.tasks;
 
-public abstract class WorkTask {
+import java.util.ArrayList;
 
+public abstract class WorkTask {
 }

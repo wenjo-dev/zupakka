@@ -9,12 +9,14 @@ import akka.actor.typed.javadsl.Receive;
 import akka.actor.typed.receptionist.Receptionist;
 import de.ddm.actors.patterns.LargeMessageProxy;
 import de.ddm.actors.profiling.tasks.UniqueColumnTask;
+import de.ddm.actors.profiling.tasks.WorkTask;
 import de.ddm.serialization.AkkaSerializable;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.util.*;
+import java.util.Random;
+import java.util.Set;
 
 public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message> {
 
@@ -39,24 +41,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	public static class TaskMessage implements Message {
 		private static final long serialVersionUID = -4667745204456518160L;
 		ActorRef<LargeMessageProxy.Message> dependencyMinerLargeMessageProxy;
-		int task;
-	}
-
-	@Getter
-	@NoArgsConstructor
-	@AllArgsConstructor
-	public static class IdleStateMessage implements Message {
-		private static final long serialVersionUID = -4667745203456218160L;
-		ActorRef<LargeMessageProxy.Message> dependencyMinerLargeMessageProxy;
-	}
-
-	@Getter
-	@NoArgsConstructor
-	@AllArgsConstructor
-	public static class RemoveDuplicatesMessage implements Message {
-		private static final long serialVersionUID = -4667743782456218160L;
-		ActorRef<LargeMessageProxy.Message> dependencyMinerLargeMessageProxy;
-		UniqueColumnTask task;
+		WorkTask task;
 	}
 
 	////////////////////////
@@ -71,8 +56,10 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 
 	private DependencyWorker(ActorContext<Message> context) {
 		super(context);
+
 		final ActorRef<Receptionist.Listing> listingResponseAdapter = context.messageAdapter(Receptionist.Listing.class, ReceptionistListingMessage::new);
 		context.getSystem().receptionist().tell(Receptionist.subscribe(DependencyMiner.dependencyMinerService, listingResponseAdapter));
+
 		this.largeMessageProxy = this.getContext().spawn(LargeMessageProxy.create(this.getContext().getSelf().unsafeUpcast()), LargeMessageProxy.DEFAULT_NAME);
 	}
 
@@ -91,8 +78,6 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		return newReceiveBuilder()
 				.onMessage(ReceptionistListingMessage.class, this::handle)
 				.onMessage(TaskMessage.class, this::handle)
-				.onMessage(IdleStateMessage.class, this::handle)
-				.onMessage(RemoveDuplicatesMessage.class, this::handle)
 				.build();
 	}
 
@@ -103,46 +88,17 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		return this;
 	}
 
-
 	private Behavior<Message> handle(TaskMessage message) {
-		this.getContext().getLog().info("Working on " + message.getTask());
-		// I should probably know how to solve this task, but for now I just pretend some work...
+		if (message.getTask().getClass().equals(UniqueColumnTask.class)){
+			ActorRef<UniqueColumnCreator.Message> actor = getContext().spawn(UniqueColumnCreator.create((UniqueColumnTask) message.getTask()),
+					UniqueColumnCreator.DEFAULT_NAME + "_" + ((UniqueColumnTask) message.getTask()).getTableIndex()
+							+ ";" + ((UniqueColumnTask) message.getTask()).getColumnIndex());
+			actor.tell(new UniqueColumnCreator.CreateUniqueColumnMessage(this.largeMessageProxy, this.getContext().getSelf()));
+		}
 
-		int result = 1;
-		long time = System.currentTimeMillis();
-		Random rand = new Random();
-		int runtime = (rand.nextInt(2) + 2) * 1000;
-		while (System.currentTimeMillis() - time < runtime)
-			result = ((int) Math.abs(Math.sqrt(result)) * result) % 1334525;
+		//LargeMessageProxy.LargeMessage completionMessage = new DependencyMiner.CompletionMessage(this.getContext().getSelf(), result);
+		//this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(completionMessage, message.getDependencyMinerLargeMessageProxy()));
 
-		LargeMessageProxy.LargeMessage completionMessage = new DependencyMiner.CompletionMessage(this.getContext().getSelf(), result);
-		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(completionMessage, message.getDependencyMinerLargeMessageProxy()));
-
-		return this;
-	}
-
-	private Behavior<Message> handle(IdleStateMessage message) {
-		this.getContext().getLog().info("Checking for Work..");
-		LargeMessageProxy.LargeMessage taskRequestMsg = new DependencyMiner.TaskRequestMessage(this.getContext().getSelf());
-		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(taskRequestMsg, message.getDependencyMinerLargeMessageProxy()));
-		return this;
-	}
-
-	private Behavior<Message> handle(RemoveDuplicatesMessage message){
-		this.getContext().getLog().info("Removing duplicates in table " + message.getTask().getTableIndex() + " column " + message.getTask().getColumnIndex());
-		ArrayList<String> result = new ArrayList<>();
-		String[] data = message.task.getData();
-        for (String val : data) {
-            if (!result.contains(val)) {
-                result.add(val);
-            }
-        }
-		this.getContext().getLog().info("Process finished. Sending results back to master..");
-		LargeMessageProxy.LargeMessage taskFinishedMsg = new DependencyMiner.UniqueColumnTaskCompletedMessage(this.getContext().getSelf(), result, message.getTask().getTableIndex(), message.getTask().getColumnIndex());
-		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(taskFinishedMsg, message.getDependencyMinerLargeMessageProxy()));
-		// Request more work..
-		LargeMessageProxy.LargeMessage taskRequestMsg = new DependencyMiner.TaskRequestMessage(this.getContext().getSelf());
-		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(taskRequestMsg, message.getDependencyMinerLargeMessageProxy()));
 		return this;
 	}
 }

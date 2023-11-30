@@ -10,8 +10,8 @@ import akka.actor.typed.javadsl.Receive;
 import akka.actor.typed.receptionist.Receptionist;
 import akka.actor.typed.receptionist.ServiceKey;
 import de.ddm.actors.patterns.LargeMessageProxy;
-import de.ddm.actors.profiling.tasks.DataManager;
 import de.ddm.actors.profiling.tasks.UniqueColumnTask;
+import de.ddm.actors.profiling.tasks.WorkTask;
 import de.ddm.serialization.AkkaSerializable;
 import de.ddm.singletons.InputConfigurationSingleton;
 import de.ddm.singletons.SystemConfigurationSingleton;
@@ -77,21 +77,12 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	@Getter
 	@NoArgsConstructor
 	@AllArgsConstructor
-	public static class TaskRequestMessage implements Message {
-		private static final long serialVersionUID = -7242425159675583598L;
-		ActorRef<DependencyWorker.Message> dependencyWorker;
+	public static class ColumnCreationMessage implements Message {
+		private static final long serialVersionUID = -7642422259675583598L;
+		ActorRef<ColumnCreator.Message> columnCreator;
+		ArrayList<UniqueColumnTask> taskList;
 	}
 
-	@Getter
-	@NoArgsConstructor
-	@AllArgsConstructor
-	public static class UniqueColumnTaskCompletedMessage implements Message {
-		private static final long serialVersionUID = -7242425159675581998L;
-		ActorRef<DependencyWorker.Message> dependencyWorker;
-		ArrayList<String> data;
-		int tableIndex;
-		int columnIndex;
-	}
 	////////////////////////
 	// Actor Construction //
 	////////////////////////
@@ -116,7 +107,9 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		this.resultCollector = context.spawn(ResultCollector.create(), ResultCollector.DEFAULT_NAME);
 		this.largeMessageProxy = this.getContext().spawn(LargeMessageProxy.create(this.getContext().getSelf().unsafeUpcast()), LargeMessageProxy.DEFAULT_NAME);
 
-		this.dependencyWorkers = new ArrayList<>();
+		this.busyWorkers = new ArrayList<>();
+		this.idleWorkers = new ArrayList<>();
+		this.columnCreators = new ArrayList<>();
 
 		context.getSystem().receptionist().tell(Receptionist.register(dependencyMinerService, context.getSelf()));
 	}
@@ -130,12 +123,15 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	private final boolean discoverNaryDependencies;
 	private final File[] inputFiles;
 	private final String[][] headerLines;
-
 	private final List<ActorRef<InputReader.Message>> inputReaders;
 	private final ActorRef<ResultCollector.Message> resultCollector;
 	private final ActorRef<LargeMessageProxy.Message> largeMessageProxy;
-
-	private final List<ActorRef<DependencyWorker.Message>> dependencyWorkers;
+	private final List<ActorRef<DependencyWorker.Message>> busyWorkers;
+	private final List<ActorRef<DependencyWorker.Message>> idleWorkers;
+	// custom
+	private List<WorkTask> workList = new ArrayList<>();
+	private List<ActorRef<ColumnCreator.Message>> columnCreators;
+	private final ArrayList<String[]>[] originalFileContents = new ArrayList[7];
 
 	////////////////////
 	// Actor Behavior //
@@ -149,8 +145,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 				.onMessage(HeaderMessage.class, this::handle)
 				.onMessage(RegistrationMessage.class, this::handle)
 				.onMessage(CompletionMessage.class, this::handle)
-				.onMessage(TaskRequestMessage.class, this::handle)
-				.onMessage(UniqueColumnTaskCompletedMessage.class, this::handle)
+				.onMessage(ColumnCreationMessage.class, this::handle)
 				.onSignal(Terminated.class, this::handle)
 				.build();
 	}
@@ -170,29 +165,42 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	}
 
 	private Behavior<Message> handle(BatchMessage message) {
-		if (DataManager.fileContents[0] == null){
+		if (this.originalFileContents[0] == null){
 			for (int i = 0; i < 7; i++) {
-				DataManager.fileContents[i] = new ArrayList<>();
+				this.originalFileContents[i] = new ArrayList<>();
 			}
 		}
 		if (!message.getBatch().isEmpty()){
 			this.inputReaders.get(message.getId()).tell(new InputReader.ReadBatchMessage(this.getContext().getSelf()));
-			DataManager.fileContents[message.getId()].addAll(message.getBatch());
+			this.originalFileContents[message.getId()].addAll(message.getBatch());
 		} else {
-			this.getContext().getLog().info("Reading Data from TABLE " + message.getId() + ". Found " + DataManager.fileContents[message.getId()].size() + " Entries.");
-			UniqueColumnTask.createUniqueColumnTasks(DataManager.fileContents[message.getId()], message.getId());
-			DataManager.currentTask = DataManager.CurrentTask.RemoveDuplicates;
+			this.getContext().getLog().info(this.originalFileContents[message.getId()].size() + " entries loaded " +
+					"from table " + message.getId() + ". Spawning ColumnCreator Actor");
+			this.columnCreators.add(getContext().spawn(ColumnCreator.create(message.getId(), this.originalFileContents[message.getId()]), ColumnCreator.DEFAULT_NAME + "_" + message.getId()));
+			this.columnCreators.get(this.columnCreators.size() - 1).tell(new ColumnCreator.CreateColumnsMessage(this.getContext().getSelf()));
+
 		}
 		return this;
 	}
 
 	private Behavior<Message> handle(RegistrationMessage message) {
 		ActorRef<DependencyWorker.Message> dependencyWorker = message.getDependencyWorker();
-		if (!this.dependencyWorkers.contains(dependencyWorker)) {
-			this.dependencyWorkers.add(dependencyWorker);
-			this.getContext().watch(dependencyWorker);
-			dependencyWorker.tell(new DependencyWorker.IdleStateMessage(this.largeMessageProxy));
+
+		if (this.idleWorkers.contains(dependencyWorker) || this.busyWorkers.contains(dependencyWorker))
+			return this;
+
+		this.getContext().watch(dependencyWorker);
+
+		if(this.workList.isEmpty()){
+			this.idleWorkers.add(dependencyWorker);
+			return this;
 		}
+
+		WorkTask task = this.workList.get(0);
+		this.workList.remove(0);
+		this.busyWorkers.add(dependencyWorker);
+		dependencyWorker.tell(new DependencyWorker.TaskMessage(this.largeMessageProxy, task));
+
 		return this;
 	}
 
@@ -218,7 +226,6 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		// Once I found all unary INDs, I could check if this.discoverNaryDependencies is set to true and try to detect n-ary INDs as well!
 
 		//dependencyWorker.tell(new DependencyWorker.TaskMessage(this.largeMessageProxy, 42));
-		dependencyWorker.tell(new DependencyWorker.TaskMessage(this.largeMessageProxy, 0));
 
 		// At some point, I am done with the discovery. That is when I should call my end method. Because I do not work on a completable task yet, I simply call it after some time.
 		if (System.currentTimeMillis() - this.startTime > 2000000)
@@ -226,30 +233,10 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		return this;
 	}
 
-	private Behavior<Message> handle(TaskRequestMessage message) {
-		ActorRef<DependencyWorker.Message> dependencyWorker = message.getDependencyWorker();
-		switch(DataManager.currentTask){
-			case ReadData:
-				dependencyWorker.tell(new DependencyWorker.IdleStateMessage(this.largeMessageProxy));
-				break;
-			case RemoveDuplicates:
-				if(!DataManager.workTasks.isEmpty()){
-					this.getContext().getLog().info("Sending Data to worker to create unique columns..");
-					dependencyWorker.tell(new DependencyWorker.RemoveDuplicatesMessage(this.largeMessageProxy,
-                            (UniqueColumnTask) DataManager.workTasks.get(0)));
-					DataManager.workTasks.remove(0);
-				}
-				break;
-			case FindUnaryINDS:
-				break;
-		}
-
-		return this;
-	}
-
-	private Behavior<Message> handle(UniqueColumnTaskCompletedMessage message) {
-		ActorRef<DependencyWorker.Message> dependencyWorker = message.getDependencyWorker();
-		this.getContext().getLog().info("RECEIVED FROM TABLE: " + message.getTableIndex());
+	private Behavior<Message> handle(ColumnCreationMessage message) {
+		this.getContext().getLog().info("Received " + message.taskList.size() + " columns from table " + message.taskList.get(0).getTableIndex());
+		this.columnCreators.remove(message.columnCreator);
+		assignTasksToWorkers();
 		return this;
 	}
 
@@ -261,7 +248,23 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 	private Behavior<Message> handle(Terminated signal) {
 		ActorRef<DependencyWorker.Message> dependencyWorker = signal.getRef().unsafeUpcast();
-		this.dependencyWorkers.remove(dependencyWorker);
+		if(this.busyWorkers.contains(dependencyWorker)){
+			this.busyWorkers.remove(dependencyWorker);
+		} else {
+			this.idleWorkers.remove(dependencyWorker);
+		}
 		return this;
+	}
+
+	private void assignTasksToWorkers(){
+		while (!this.workList.isEmpty() && !this.idleWorkers.isEmpty()){
+			WorkTask task = this.workList.get(0);
+			this.workList.remove(0);
+			ActorRef<DependencyWorker.Message> worker = this.idleWorkers.get(0);
+			this.idleWorkers.remove(0);
+			this.busyWorkers.add(worker);
+			worker.tell(new DependencyWorker.TaskMessage(this.largeMessageProxy, task));
+			this.getContext().getLog().info("Assigning " + task.getClass() + " to worker.");
+		}
 	}
 }
