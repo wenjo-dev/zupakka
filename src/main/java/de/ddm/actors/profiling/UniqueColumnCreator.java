@@ -13,6 +13,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+
 public class UniqueColumnCreator extends AbstractBehavior<UniqueColumnCreator.Message> {
 
     ////////////////////
@@ -27,7 +29,6 @@ public class UniqueColumnCreator extends AbstractBehavior<UniqueColumnCreator.Me
     @AllArgsConstructor
     public static class CreateUniqueColumnMessage implements Message {
         private static final long serialVersionUID = 1739062314525633711L;
-        ActorRef<LargeMessageProxy.Message> dependencyMinerLargeMessageProxy;
         ActorRef<DependencyWorker.Message> worker;
     }
 
@@ -64,7 +65,14 @@ public class UniqueColumnCreator extends AbstractBehavior<UniqueColumnCreator.Me
     }
 
     private Behavior<UniqueColumnCreator.Message> handle(UniqueColumnCreator.CreateUniqueColumnMessage message) {
-
+        ArrayList<String> result = new ArrayList<>();
+        for (String s: this.task.getData()){
+            if(!result.contains(s)){
+                result.add(s);
+            }
+        }
+        message.getWorker().tell(new DependencyWorker.UniqueColumnResultMessage(result, this.task.getTableIndex(),
+                this.task.getColumnIndex()));
         return this;
     }
 

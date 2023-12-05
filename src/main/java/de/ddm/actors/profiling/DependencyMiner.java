@@ -83,6 +83,17 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		ArrayList<UniqueColumnTask> taskList;
 	}
 
+	@Getter
+	@NoArgsConstructor
+	@AllArgsConstructor
+	public static class UniqueColumnToMinerMessage implements Message {
+		private static final long serialVersionUID = -7642422259678734598L;
+		ActorRef<DependencyWorker.Message> dependencyWorker;
+		ArrayList<String> data;
+		int tableIndex;
+		int columnIndex;
+	}
+
 	////////////////////////
 	// Actor Construction //
 	////////////////////////
@@ -146,6 +157,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 				.onMessage(RegistrationMessage.class, this::handle)
 				.onMessage(CompletionMessage.class, this::handle)
 				.onMessage(ColumnCreationMessage.class, this::handle)
+				.onMessage(UniqueColumnToMinerMessage.class, this::handle)
 				.onSignal(Terminated.class, this::handle)
 				.build();
 	}
@@ -178,7 +190,6 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 					"from table " + message.getId() + ". Spawning ColumnCreator Actor");
 			this.columnCreators.add(getContext().spawn(ColumnCreator.create(message.getId(), this.originalFileContents[message.getId()]), ColumnCreator.DEFAULT_NAME + "_" + message.getId()));
 			this.columnCreators.get(this.columnCreators.size() - 1).tell(new ColumnCreator.CreateColumnsMessage(this.getContext().getSelf()));
-
 		}
 		return this;
 	}
@@ -195,6 +206,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			this.idleWorkers.add(dependencyWorker);
 			return this;
 		}
+		this.idleWorkers.add(dependencyWorker);
 		assignTasksToWorkers();
 		return this;
 	}
@@ -232,6 +244,16 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		this.getContext().getLog().info("Received " + message.taskList.size() + " columns from table " + message.taskList.get(0).getTableIndex());
 		this.columnCreators.remove(message.columnCreator);
 		this.workList.addAll(message.getTaskList());
+		assignTasksToWorkers();
+		return this;
+	}
+
+	private Behavior<Message> handle(UniqueColumnToMinerMessage message) {
+		this.getContext().getLog().info("Received " + message.getData().size() + " values from worker");
+		// TODO: SAVE STUFF
+		// BUGGT RUM, ABER WEITER MACHEN HIER
+		this.busyWorkers.remove(message.getDependencyWorker());
+		this.idleWorkers.add(message.getDependencyWorker());
 		assignTasksToWorkers();
 		return this;
 	}

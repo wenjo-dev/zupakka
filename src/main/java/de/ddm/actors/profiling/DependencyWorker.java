@@ -15,6 +15,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.Set;
 
@@ -44,11 +45,23 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		UniqueColumnTask task;
 	}
 
+	@Getter
+	@NoArgsConstructor
+	@AllArgsConstructor
+	public static class UniqueColumnResultMessage implements Message {
+		private static final long serialVersionUID = -4661745204456512260L;
+		ArrayList<String> data;
+		int tableIndex;
+		int columnIndex;
+	}
+
 	////////////////////////
 	// Actor Construction //
 	////////////////////////
 
 	public static final String DEFAULT_NAME = "dependencyWorker";
+
+	private static ActorRef<LargeMessageProxy.Message> dependencyMinerLargeMessageProxy;
 
 	public static Behavior<Message> create() {
 		return Behaviors.setup(DependencyWorker::new);
@@ -78,6 +91,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		return newReceiveBuilder()
 				.onMessage(ReceptionistListingMessage.class, this::handle)
 				.onMessage(UniqueColumnTaskMessage.class, this::handle)
+				.onMessage(UniqueColumnResultMessage.class, this::handle)
 				.build();
 	}
 
@@ -90,16 +104,19 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 
 	private Behavior<Message> handle(UniqueColumnTaskMessage message) {
 		this.getContext().getLog().info("Received " + message.getTask().getClass() + " for " +  (message.getTask()).getData().length + " entries.");
-		this.getContext().getLog().info("Spawning Actor to create unique columns..");
+		this.getContext().getLog().info("Spawning Actor to create unique column..");
+		DependencyWorker.dependencyMinerLargeMessageProxy = message.getDependencyMinerLargeMessageProxy();
 		ActorRef<UniqueColumnCreator.Message> actor = getContext().spawn(UniqueColumnCreator.create(message.getTask()),
 				UniqueColumnCreator.DEFAULT_NAME + "_" + (message.getTask()).getTableIndex()
 						+ ";" + (message.getTask()).getColumnIndex());
-		actor.tell(new UniqueColumnCreator.CreateUniqueColumnMessage(this.largeMessageProxy, this.getContext().getSelf()));
+		actor.tell(new UniqueColumnCreator.CreateUniqueColumnMessage(this.getContext().getSelf()));
+		return this;
+	}
 
-
-		//LargeMessageProxy.LargeMessage completionMessage = new DependencyMiner.CompletionMessage(this.getContext().getSelf(), result);
-		//this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(completionMessage, message.getDependencyMinerLargeMessageProxy()));
-
+	private Behavior<Message> handle(UniqueColumnResultMessage message) {
+		this.getContext().getLog().info("TASK DONE: " + message.data.size() + " unique values found. Sending Data to master..");
+		LargeMessageProxy.LargeMessage completionMessage = new DependencyMiner.UniqueColumnToMinerMessage(this.getContext().getSelf(), message.getData(), message.getTableIndex(), message.getColumnIndex());
+		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(completionMessage, DependencyWorker.dependencyMinerLargeMessageProxy));
 		return this;
 	}
 }
