@@ -217,7 +217,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	}
 
 	private Behavior<Message> handle(UniqueColumnToMinerMessage message) {
-		this.getContext().getLog().info("Received " + message.getData().size() + " values from worker");
+		this.getContext().getLog().info("Received " + message.getData().size() + " unique values for table " + message.tableIndex + " column " + message.columnIndex);
 		// TODO: SAVE STUFF
 
 		// BUGGT RUM, ABER WEITER MACHEN HIER
@@ -253,7 +253,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			if(task.getClass().equals(UniqueColumnTask.class)){
 				LargeMessageProxy.LargeMessage msg = new DependencyWorker.UniqueColumnTaskMessage(this.largeMessageProxy, ((UniqueColumnTask)task));
 				this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, this.workers.get(worker)));
-				this.getContext().getLog().info("Assigning Task '" + task.getClass() + "' to worker.");
+				this.getContext().getLog().info("Assigning Task '" + task.getClass() + "' to worker");
 			}
 		}
 	}

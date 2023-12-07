@@ -104,7 +104,6 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 
 	private Behavior<Message> handle(UniqueColumnTaskMessage message) {
 		this.getContext().getLog().info("Received " + message.getTask().getClass() + " for " +  (message.getTask()).getData().length + " entries.");
-		this.getContext().getLog().info("Spawning Actor to create unique column..");
 		DependencyWorker.dependencyMinerLargeMessageProxy = message.getDependencyMinerLargeMessageProxy();
 		ActorRef<UniqueColumnCreator.Message> actor = getContext().spawn(UniqueColumnCreator.create(message.getTask()),
 				UniqueColumnCreator.DEFAULT_NAME + "_" + (message.getTask()).getTableIndex()
