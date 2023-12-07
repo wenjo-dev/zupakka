@@ -119,6 +119,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		this.resultCollector = context.spawn(ResultCollector.create(), ResultCollector.DEFAULT_NAME);
 		this.largeMessageProxy = this.getContext().spawn(LargeMessageProxy.create(this.getContext().getSelf().unsafeUpcast()), LargeMessageProxy.DEFAULT_NAME);
 
+		workers = new HashMap<>();
+
 		this.busyWorkers = new ArrayList<>();
 		this.idleWorkers = new ArrayList<>();
 		this.columnCreators = new ArrayList<>();
@@ -138,6 +140,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	private final List<ActorRef<InputReader.Message>> inputReaders;
 	private final ActorRef<ResultCollector.Message> resultCollector;
 	private final ActorRef<LargeMessageProxy.Message> largeMessageProxy;
+
+	private final Map<ActorRef<DependencyWorker.Message>,ActorRef<LargeMessageProxy.Message>> workers;
 	private final List<ActorRef<DependencyWorker.Message>> busyWorkers;
 	private final List<ActorRef<DependencyWorker.Message>> idleWorkers;
 	// custom
@@ -197,10 +201,12 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 	private Behavior<Message> handle(RegistrationMessage message) {
 		ActorRef<DependencyWorker.Message> dependencyWorker = message.getDependencyWorker();
+		ActorRef<LargeMessageProxy.Message> dependencyWorkerLargeMessageProxy = message.getDependencyWorkerLargeMessageProxy();
 
-		if (this.idleWorkers.contains(dependencyWorker) || this.busyWorkers.contains(dependencyWorker))
+		if(this.workers.containsKey(dependencyWorker))
 			return this;
 
+		this.workers.put(dependencyWorker, dependencyWorkerLargeMessageProxy);
 		this.getContext().watch(dependencyWorker);
 
 		if(this.workList.isEmpty()){
@@ -285,7 +291,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			this.busyWorkers.add(worker);
 			if(task.getClass().equals(UniqueColumnTask.class)){
 				LargeMessageProxy.LargeMessage msg = new DependencyWorker.UniqueColumnTaskMessage(this.largeMessageProxy, ((UniqueColumnTask)task));
-				this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, DependencyWorker.dependencyMinerLargeMessageProxy));
+				this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, this.workers.get(worker)));
 				this.getContext().getLog().info("Assigning Task '" + task.getClass() + "' to worker.");
 			}
 		}
