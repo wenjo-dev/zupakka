@@ -19,11 +19,11 @@ import de.ddm.structures.InclusionDependency;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
@@ -63,6 +63,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	public static class RegistrationMessage implements Message {
 		private static final long serialVersionUID = -4025238529984914107L;
 		ActorRef<DependencyWorker.Message> dependencyWorker;
+		ActorRef<LargeMessageProxy.Message> dependencyWorkerLargeMessageProxy;
 	}
 
 	@Getter
@@ -283,8 +284,9 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			this.idleWorkers.remove(0);
 			this.busyWorkers.add(worker);
 			if(task.getClass().equals(UniqueColumnTask.class)){
-				worker.tell(new DependencyWorker.UniqueColumnTaskMessage(this.largeMessageProxy, ((UniqueColumnTask)task)));
-				this.getContext().getLog().info("Assigning " + task.getClass() + " to worker.");
+				LargeMessageProxy.LargeMessage msg = new DependencyWorker.UniqueColumnTaskMessage(this.largeMessageProxy, ((UniqueColumnTask)task));
+				this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, DependencyWorker.dependencyMinerLargeMessageProxy));
+				this.getContext().getLog().info("Assigning Task '" + task.getClass() + "' to worker.");
 			}
 		}
 	}
