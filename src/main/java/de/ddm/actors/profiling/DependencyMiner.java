@@ -251,6 +251,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	private Behavior<Message> handle(UniqueColumnToMinerMessage message) {
 		this.getContext().getLog().info("Received " + message.getData().size() + " values from worker");
 		// TODO: SAVE STUFF
+
 		// BUGGT RUM, ABER WEITER MACHEN HIER
 		this.busyWorkers.remove(message.getDependencyWorker());
 		this.idleWorkers.add(message.getDependencyWorker());
