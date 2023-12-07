@@ -114,7 +114,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	}
 
 	private Behavior<Message> handle(UniqueColumnResultMessage message) {
-		this.getContext().getLog().info("TASK DONE: " + message.data.size() + " unique values found. Sending Data to master..");
+		this.getContext().getLog().info("Found " + message.data.size() + " unique values in table " + message.tableIndex + " column " + message.getColumnIndex());
 		LargeMessageProxy.LargeMessage completionMessage = new DependencyMiner.UniqueColumnToMinerMessage(this.getContext().getSelf(), message.getData(), message.getTableIndex(), message.getColumnIndex());
 		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(completionMessage, DependencyWorker.dependencyMinerLargeMessageProxy));
 		return this;

@@ -69,15 +69,6 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	@Getter
 	@NoArgsConstructor
 	@AllArgsConstructor
-	public static class CompletionMessage implements Message {
-		private static final long serialVersionUID = -7642425159675583598L;
-		ActorRef<DependencyWorker.Message> dependencyWorker;
-		int result;
-	}
-
-	@Getter
-	@NoArgsConstructor
-	@AllArgsConstructor
 	public static class ColumnCreationMessage implements Message {
 		private static final long serialVersionUID = -7642422259675583598L;
 		ActorRef<ColumnCreator.Message> columnCreator;
@@ -119,7 +110,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		this.resultCollector = context.spawn(ResultCollector.create(), ResultCollector.DEFAULT_NAME);
 		this.largeMessageProxy = this.getContext().spawn(LargeMessageProxy.create(this.getContext().getSelf().unsafeUpcast()), LargeMessageProxy.DEFAULT_NAME);
 
-		workers = new HashMap<>();
+		this.workers = new HashMap<>();
 
 		this.busyWorkers = new ArrayList<>();
 		this.idleWorkers = new ArrayList<>();
@@ -160,7 +151,6 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 				.onMessage(BatchMessage.class, this::handle)
 				.onMessage(HeaderMessage.class, this::handle)
 				.onMessage(RegistrationMessage.class, this::handle)
-				.onMessage(CompletionMessage.class, this::handle)
 				.onMessage(ColumnCreationMessage.class, this::handle)
 				.onMessage(UniqueColumnToMinerMessage.class, this::handle)
 				.onSignal(Terminated.class, this::handle)
@@ -215,35 +205,6 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		}
 		this.idleWorkers.add(dependencyWorker);
 		assignTasksToWorkers();
-		return this;
-	}
-
-	private Behavior<Message> handle(CompletionMessage message) {
-		ActorRef<DependencyWorker.Message> dependencyWorker = message.getDependencyWorker();
-		// If this was a reasonable result, I would probably do something with it and potentially generate more work ... for now, let's just generate a random, binary IND.
-
-		if (this.headerLines[0] != null) {
-			Random random = new Random();
-			int dependent = random.nextInt(this.inputFiles.length);
-			int referenced = random.nextInt(this.inputFiles.length);
-			File dependentFile = this.inputFiles[dependent];
-			File referencedFile = this.inputFiles[referenced];
-			String[] dependentAttributes = {this.headerLines[dependent][random.nextInt(this.headerLines[dependent].length)], this.headerLines[dependent][random.nextInt(this.headerLines[dependent].length)]};
-			String[] referencedAttributes = {this.headerLines[referenced][random.nextInt(this.headerLines[referenced].length)], this.headerLines[referenced][random.nextInt(this.headerLines[referenced].length)]};
-			InclusionDependency ind = new InclusionDependency(dependentFile, dependentAttributes, referencedFile, referencedAttributes);
-			List<InclusionDependency> inds = new ArrayList<>(1);
-			inds.add(ind);
-
-			this.resultCollector.tell(new ResultCollector.ResultMessage(inds));
-		}
-		// I still don't know what task the worker could help me to solve ... but let me keep her busy.
-		// Once I found all unary INDs, I could check if this.discoverNaryDependencies is set to true and try to detect n-ary INDs as well!
-
-		//dependencyWorker.tell(new DependencyWorker.TaskMessage(this.largeMessageProxy, 42));
-
-		// At some point, I am done with the discovery. That is when I should call my end method. Because I do not work on a completable task yet, I simply call it after some time.
-		if (System.currentTimeMillis() - this.startTime > 2000000)
-			this.end();
 		return this;
 	}
 
