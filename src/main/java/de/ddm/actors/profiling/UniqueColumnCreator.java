@@ -8,6 +8,7 @@ import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 import de.ddm.actors.patterns.LargeMessageProxy;
 import de.ddm.actors.profiling.tasks.UniqueColumnTask;
+import de.ddm.configuration.SystemConfiguration;
 import de.ddm.serialization.AkkaSerializable;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -66,20 +67,35 @@ public class UniqueColumnCreator extends AbstractBehavior<UniqueColumnCreator.Me
 
     private Behavior<UniqueColumnCreator.Message> handle(UniqueColumnCreator.CreateUniqueColumnMessage message) {
         double size = this.task.getData().size();
-        double redundancies = 0;
-        double current = 0;
+        double redundancies = 0.0;
+        double current = 0.0;
+        double lastLogTime = System.currentTimeMillis();
+        boolean checkReached = false;
 
         ArrayList<String> result = new ArrayList<>();
         for (String s: this.task.getData()){
-            if(!result.contains(s)){
+            if(!result.contains(s))
                 result.add(s);
-            } else {
+            else
                 redundancies += 1;
-                this.getContext().getLog().info("redundant value found: "+s);
-            }
             current += 1;
-            if(current / size >= 0.2 && redundancies / current >= 0.2) {
-                this.getContext().getLog().info("the first 20 percent of this column contain at least 20 percent redundant values - continue search for uniques");
+
+            // log
+            if(System.currentTimeMillis() - lastLogTime >= 1000) {
+                this.getContext().getLog().info("table "+this.task.getTableIndex()+", column "+this.task.getColumnIndex()+": "+ (Math.round(current / size * 10000.0) / 100.0)+"% checked - redundancy quote: "+(Math.round(redundancies / current * 10000.0) / 100.0)+"%");
+                lastLogTime = System.currentTimeMillis();
+            }
+
+            if(!checkReached && current >= 10000) {
+                checkReached = true;
+                if (redundancies / current >= SystemConfiguration.redundancyThreshold)
+                    this.getContext().getLog().info("the first 10k values contain at least 20% redundant values - continue search for uniques");
+                else {
+                    this.getContext().getLog().info("the first 10k of values contain less than 20% redundant values - aborting search for uniques");
+                    message.getWorker().tell(new DependencyWorker.UniqueColumnResultMessage(this.task.getData(), this.task.getTableIndex(),
+                            this.task.getColumnIndex()));
+                    return this;
+                }
             }
         }
         message.getWorker().tell(new DependencyWorker.UniqueColumnResultMessage(result, this.task.getTableIndex(),
