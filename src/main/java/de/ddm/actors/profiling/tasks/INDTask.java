@@ -9,8 +9,11 @@ import java.util.ArrayList;
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
-public class UniqueColumnTask extends WorkTask {
-    ArrayList<String> data;
-    int tableIndex;
-    int columnIndex;
+public class INDTask extends WorkTask {
+    ArrayList<String> c1;
+    ArrayList<String> c2;
+    int c1TableIndex;
+    int c1ColumnIndex;
+    int c2TableIndex;
+    int c2ColumnIndex;
 }

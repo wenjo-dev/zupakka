@@ -32,6 +32,9 @@ public class SystemConfiguration {
 
 	private boolean hardMode = false;					// Solve the hard version of the task
 
+	// search for unique values first
+	public static boolean uniquesFirst = true;
+
 	private static String getDefaultHost() {
 		try {
 			return InetAddress.getLocalHost().getHostAddress();

@@ -10,8 +10,10 @@ import akka.actor.typed.javadsl.Receive;
 import akka.actor.typed.receptionist.Receptionist;
 import akka.actor.typed.receptionist.ServiceKey;
 import de.ddm.actors.patterns.LargeMessageProxy;
+import de.ddm.actors.profiling.tasks.INDTask;
 import de.ddm.actors.profiling.tasks.UniqueColumnTask;
 import de.ddm.actors.profiling.tasks.WorkTask;
+import de.ddm.configuration.SystemConfiguration;
 import de.ddm.serialization.AkkaSerializable;
 import de.ddm.singletons.InputConfigurationSingleton;
 import de.ddm.singletons.SystemConfigurationSingleton;
@@ -105,6 +107,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		this.headerLines = new String[this.inputFiles.length][];
 
 		this.inputReaders = new ArrayList<>(inputFiles.length);
+		this.originalFileContents = new ArrayList[inputFiles.length];
 		for (int id = 0; id < this.inputFiles.length; id++)
 			this.inputReaders.add(context.spawn(InputReader.create(id, this.inputFiles[id]), InputReader.DEFAULT_NAME + "_" + id));
 		this.resultCollector = context.spawn(ResultCollector.create(), ResultCollector.DEFAULT_NAME);
@@ -138,7 +141,11 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	// custom
 	private List<WorkTask> workList = new ArrayList<>();
 	private List<ActorRef<ColumnCreator.Message>> columnCreators;
-	private final ArrayList<String[]>[] originalFileContents = new ArrayList[7];
+
+	private int filesRead = 0;
+	private final ArrayList<String[]>[] originalFileContents;
+	// all columns with their origin [table-index][column-index] as key
+	private final ArrayList<Map<Integer, ArrayList<String>>> columns = new ArrayList<>();
 
 	////////////////////
 	// Actor Behavior //
@@ -175,6 +182,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		if (this.originalFileContents[0] == null){
 			for (int i = 0; i < 7; i++) {
 				this.originalFileContents[i] = new ArrayList<>();
+				this.columns.add(new HashMap<Integer, ArrayList<String>>());
 			}
 		}
 		if (!message.getBatch().isEmpty()){
@@ -208,21 +216,47 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		return this;
 	}
 
+	private void createInternalINDTasks(int tableIndex) {
+		this.getContext().getLog().info("creating internal IND task for "+tableIndex);
+		for(int i = 0; i < this.columns.get(tableIndex).size(); i++) {
+			for(int j = 0; j < this.columns.get(tableIndex).size(); j++) {
+				if(i == j) continue;
+				this.workList.add(new INDTask(this.columns.get(tableIndex).get(i), this.columns.get(tableIndex).get(j),
+						tableIndex, i, tableIndex, j));
+			}
+		}
+	}
+
 	private Behavior<Message> handle(ColumnCreationMessage message) {
 		this.getContext().getLog().info("Received " + message.taskList.size() + " columns from table " + message.taskList.get(0).getTableIndex());
 		this.columnCreators.remove(message.columnCreator);
-		this.workList.addAll(message.getTaskList());
+		this.filesRead += 1;
+		// save columns
+		for (UniqueColumnTask t: message.getTaskList()) {
+			this.columns.get(t.getTableIndex()).put(t.getColumnIndex(), t.getData());
+		}
+		if(SystemConfiguration.uniquesFirst)
+			this.workList.addAll(message.getTaskList());
+		else {
+			createInternalINDTasks(message.getTaskList().get(0).getTableIndex());
+		}
+
 		assignTasksToWorkers();
 		return this;
 	}
 
 	private Behavior<Message> handle(UniqueColumnToMinerMessage message) {
 		this.getContext().getLog().info("Received " + message.getData().size() + " unique values for table " + message.tableIndex + " column " + message.columnIndex);
-		// TODO: SAVE STUFF
-
-		// BUGGT RUM, ABER WEITER MACHEN HIER
+		this.columns.get(message.tableIndex).put(message.columnIndex, message.data);
 		this.busyWorkers.remove(message.getDependencyWorker());
 		this.idleWorkers.add(message.getDependencyWorker());
+
+		if (this.workList.isEmpty() && filesRead == this.inputFiles.length){
+			for (int i = 0; i < filesRead; i++){
+				createInternalINDTasks(i);
+			}
+		}
+
 		assignTasksToWorkers();
 		return this;
 	}
@@ -255,6 +289,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 				LargeMessageProxy.LargeMessage msg = new DependencyWorker.UniqueColumnTaskMessage(this.largeMessageProxy, ((UniqueColumnTask)task));
 				this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, this.workers.get(worker)));
 				this.getContext().getLog().info("Assigning Task '" + task.getClass() + "' to worker");
+			} else if(task.getClass().equals(INDTask.class)) {
+				// TODO message stuff
 			}
 		}
 	}

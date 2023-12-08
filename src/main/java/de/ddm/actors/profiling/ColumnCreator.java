@@ -68,9 +68,9 @@ public class ColumnCreator extends AbstractBehavior<ColumnCreator.Message> {
     private Behavior<ColumnCreator.Message> handle(ColumnCreator.CreateColumnsMessage message) {
         ArrayList<UniqueColumnTask> taskList = new ArrayList<>();
         for (int i = 0; i < this.table.get(0).length; i++){
-            String[] column = new String[this.table.size()];
+            ArrayList<String> column = new ArrayList<>();
             for (int j = 0; j < this.table.size(); j++){
-                column[j] = this.table.get(j)[i];
+                column.add(this.table.get(j)[i]);
             }
             taskList.add(new UniqueColumnTask(column, this.id, i));
         }
