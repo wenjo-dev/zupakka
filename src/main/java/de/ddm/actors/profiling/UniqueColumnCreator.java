@@ -65,10 +65,21 @@ public class UniqueColumnCreator extends AbstractBehavior<UniqueColumnCreator.Me
     }
 
     private Behavior<UniqueColumnCreator.Message> handle(UniqueColumnCreator.CreateUniqueColumnMessage message) {
+        double size = this.task.getData().size();
+        double redundancies = 0;
+        double current = 0;
+
         ArrayList<String> result = new ArrayList<>();
         for (String s: this.task.getData()){
             if(!result.contains(s)){
                 result.add(s);
+            } else {
+                redundancies += 1;
+                this.getContext().getLog().info("redundant value found: "+s);
+            }
+            current += 1;
+            if(current / size >= 0.2 && redundancies / current >= 0.2) {
+                this.getContext().getLog().info("the first 20 percent of this column contain at least 20 percent redundant values - continue search for uniques");
             }
         }
         message.getWorker().tell(new DependencyWorker.UniqueColumnResultMessage(result, this.task.getTableIndex(),

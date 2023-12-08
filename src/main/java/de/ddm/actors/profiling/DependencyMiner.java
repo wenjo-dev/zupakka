@@ -235,18 +235,16 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		for (UniqueColumnTask t: message.getTaskList()) {
 			this.columns.get(t.getTableIndex()).put(t.getColumnIndex(), t.getData());
 		}
-		if(SystemConfiguration.uniquesFirst)
-			this.workList.addAll(message.getTaskList());
-		else {
-			createInternalINDTasks(message.getTaskList().get(0).getTableIndex());
-		}
+		this.workList.addAll(message.getTaskList());
 
 		assignTasksToWorkers();
 		return this;
 	}
 
 	private Behavior<Message> handle(UniqueColumnToMinerMessage message) {
-		this.getContext().getLog().info("Received " + message.getData().size() + " unique values for table " + message.tableIndex + " column " + message.columnIndex);
+		this.getContext().getLog().info("Received " + message.getData().size() + " unique values for table " + this.inputFiles[message.tableIndex].getName() + " column " + this.headerLines[message.tableIndex][message.columnIndex]);
+		double before = this.columns.get(message.tableIndex).get(message.columnIndex).size();
+		this.getContext().getLog().info(message.getData().size() + " uniques of "+before+" - reduced to "+ ((double)message.getData().size()) / before * 100.0 + " percent");
 		this.columns.get(message.tableIndex).put(message.columnIndex, message.data);
 		this.busyWorkers.remove(message.getDependencyWorker());
 		this.idleWorkers.add(message.getDependencyWorker());
