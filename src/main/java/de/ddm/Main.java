@@ -11,6 +11,7 @@ import java.io.IOException;
 public class Main {
 
 	public static void main(String[] args) {
+
 		Command.applyOn(args);
 
 		SystemConfiguration config = SystemConfigurationSingleton.get();

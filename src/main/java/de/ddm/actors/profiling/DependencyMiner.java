@@ -245,6 +245,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 	private void assignTasksToWorkers(){
 		while (!this.workList.isEmpty() && !this.idleWorkers.isEmpty()){
+			this.getContext().getLog().info("remaining tasks: "+this.workList.size());
 			WorkTask task = this.workList.get(0);
 			this.workList.remove(0);
 			ActorRef<DependencyWorker.Message> worker = this.idleWorkers.get(0);
