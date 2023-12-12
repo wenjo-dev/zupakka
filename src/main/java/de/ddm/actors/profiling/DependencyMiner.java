@@ -160,6 +160,9 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	// all columns with their origin [table-index][column-index] as key
 	private final ArrayList<Map<Integer, ArrayList<String>>> columns = new ArrayList<>();
 
+	private final ArrayList<Integer[]> pairs = new ArrayList<>();
+
+
 	////////////////////
 	// Actor Behavior //
 	////////////////////
@@ -230,15 +233,17 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		return this;
 	}
 
-	private void createInternalINDTasks(int tableIndex) {
-		this.getContext().getLog().info("creating internal IND task for "+tableIndex);
-		for(int i = 0; i < this.columns.get(tableIndex).size(); i++) {
-			for(int j = 0; j < this.columns.get(tableIndex).size(); j++) {
-				if(i == j) continue;
-				this.workList.add(new INDTask(this.columns.get(tableIndex).get(i), this.columns.get(tableIndex).get(j),
-						tableIndex, i, tableIndex, j));
+	private void createINDTasks() {
+		ArrayList<Integer[]> readyPairs = new ArrayList<>();
+		for(Integer[] pair: this.pairs) {
+			if(pair[4] == 1 && pair[5] == 1) {
+				this.workList.add(new INDTask(this.columns.get(pair[0]).get(pair[1]), this.columns.get(pair[2]).get(pair[3]),
+						pair[0], pair[1], pair[2], pair[3]));
+				readyPairs.add(pair);
 			}
 		}
+		this.getContext().getLog().info("Created " + readyPairs.size() + " IND tasks.");
+		this.pairs.removeAll(readyPairs);
 	}
 
 	private Behavior<Message> handle(ColumnCreationMessage message) {
@@ -251,8 +256,34 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		}
 		this.workList.addAll(message.getTaskList());
 
+		if(this.filesRead == this.inputFiles.length)
+			createPairCandidates();
+
 		assignTasksToWorkers();
 		return this;
+	}
+
+	private void createPairCandidates() {
+		for(int i = 0; i < this.headerLines.length; i++) {
+			for(int j = 0; j < this.headerLines[i].length; j++) {
+				// loop through columns of current table
+				for(int k = 0; k < this.headerLines[i].length; k++) {
+					if (k == j)
+						continue;
+					// t1, c1, t2, c2, tc1 ready, tc2 ready
+					this.pairs.add(new Integer[]{i, j, i, k, 0, 0});
+				}
+				// loop through other tables
+				for(int k = 0; k < this.headerLines.length; k++) {
+					if(k == i)
+						continue;
+					// loop through columns of other table
+					for(int l = 0; l < this.headerLines[k].length; l++) {
+						this.pairs.add(new Integer[]{i, j, k, l, 0, 0});
+					}
+				}
+			}
+		}
 	}
 
 	private Behavior<Message> handle(UniqueColumnToMinerMessage message) {
@@ -263,23 +294,27 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		this.busyWorkers.remove(message.getDependencyWorker());
 		this.idleWorkers.add(message.getDependencyWorker());
 
-		if (this.workList.isEmpty() && filesRead == this.inputFiles.length){
-			for (int i = 0; i < filesRead; i++){
-				createInternalINDTasks(i);
-			}
-		}
+		setColumnReady(message.tableIndex, message.columnIndex);
+
+		createINDTasks();
 
 		assignTasksToWorkers();
 		return this;
 	}
 
+	private void setColumnReady(int t, int c) {
+		for(Integer[] pair: this.pairs) {
+			if (pair[0] == t && pair[1] == c)
+				pair[4] = 1;
+			if (pair[2] == t && pair[3] == c)
+				pair[5] = 1;
+		}
+	}
+
 	private Behavior<Message> handle(INDToMinerMessage message) {
 		if(message.isDependant()){
-			this.getContext().getLog().info("Received IND: " + this.inputFiles[message.c1TableIndex] + "." + this.headerLines[message.c1TableIndex][message.c1ColumnIndex] + " -> "
-					+ this.inputFiles[message.c2TableIndex] + "." + this.headerLines[message.c2TableIndex][message.c2ColumnIndex]);
-		} else {
-			this.getContext().getLog().info("No IND was found between " + this.inputFiles[message.c1TableIndex] + "." + this.headerLines[message.c1TableIndex][message.c1ColumnIndex] + " and "
-					+ this.inputFiles[message.c2TableIndex] + "." + this.headerLines[message.c2TableIndex][message.c2ColumnIndex]);
+			this.getContext().getLog().info("Received IND: " + this.inputFiles[message.c1TableIndex].getName() + "." + this.headerLines[message.c1TableIndex][message.c1ColumnIndex] + " -> "
+					+ this.inputFiles[message.c2TableIndex].getName() + "." + this.headerLines[message.c2TableIndex][message.c2ColumnIndex]);
 		}
 		this.busyWorkers.remove(message.getDependencyWorker());
 		this.idleWorkers.add(message.getDependencyWorker());
