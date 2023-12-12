@@ -67,11 +67,24 @@ public class INDFinder extends AbstractBehavior<INDFinder.Message> {
     }
 
     private Behavior<INDFinder.Message> handle(INDFinder.FindINDMessage message) {
-        boolean isDependant = false;
+        double current = 0.0;
+        double lastLogTime = System.currentTimeMillis();
+
+        boolean isDependant = true;
         ArrayList<String> firstColumn = this.task.getC1();
         ArrayList<String> secondColumn = this.task.getC2();
-        if(firstColumn.containsAll(secondColumn)){
-            isDependant = true;
+
+        for(int i = 0; i < secondColumn.size(); i++) {
+            // log
+            if(System.currentTimeMillis() - lastLogTime >= 1000) {
+                this.getContext().getLog().info((Math.round(current / secondColumn.size() * 10000.0) / 100.0)+"% checked");
+                lastLogTime = System.currentTimeMillis();
+            }
+
+            if(!firstColumn.contains(secondColumn.get(i))) {
+                isDependant = false;
+                break;
+            }
         }
         message.getWorker().tell(new DependencyWorker.INDTaskResultMessage(task.getC1TableIndex(), task.getC1ColumnIndex(),
                 task.getC2TableIndex(), task.getC2ColumnIndex(), isDependant));
