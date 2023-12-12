@@ -67,7 +67,6 @@ public class INDFinder extends AbstractBehavior<INDFinder.Message> {
     }
 
     private Behavior<INDFinder.Message> handle(INDFinder.FindINDMessage message) {
-        double current = 0.0;
         double lastLogTime = System.currentTimeMillis();
 
         boolean isDependant = true;
@@ -77,7 +76,7 @@ public class INDFinder extends AbstractBehavior<INDFinder.Message> {
         for(int i = 0; i < secondColumn.size(); i++) {
             // log
             if(System.currentTimeMillis() - lastLogTime >= 1000) {
-                this.getContext().getLog().info((Math.round(current / secondColumn.size() * 10000.0) / 100.0)+"% checked");
+                this.getContext().getLog().info((Math.round((double)i / (double)secondColumn.size() * 10000.0) / 100.0)+"% checked");
                 lastLogTime = System.currentTimeMillis();
             }
 
