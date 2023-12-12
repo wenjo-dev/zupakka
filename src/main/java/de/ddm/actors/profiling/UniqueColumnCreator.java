@@ -92,14 +92,15 @@ public class UniqueColumnCreator extends AbstractBehavior<UniqueColumnCreator.Me
                     this.getContext().getLog().info("the first 10k values contain at least 20% redundant values - continue search for uniques");
                 else {
                     this.getContext().getLog().info("the first 10k of values contain less than 20% redundant values - aborting search for uniques");
-                    message.getWorker().tell(new DependencyWorker.UniqueColumnResultMessage(this.task.getData(), this.task.getTableIndex(),
+                    message.getWorker().tell(new DependencyWorker.UniqueColumnResultMessage(this.getContext().getSelf() , this.task.getData(), this.task.getTableIndex(),
                             this.task.getColumnIndex()));
                     return this;
                 }
             }
         }
-        message.getWorker().tell(new DependencyWorker.UniqueColumnResultMessage(result, this.task.getTableIndex(),
+        message.getWorker().tell(new DependencyWorker.UniqueColumnResultMessage(this.getContext().getSelf(), result, this.task.getTableIndex(),
                 this.task.getColumnIndex()));
+
         return this;
     }
 

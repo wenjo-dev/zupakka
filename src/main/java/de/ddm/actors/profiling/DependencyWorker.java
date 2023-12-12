@@ -52,6 +52,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	@AllArgsConstructor
 	public static class UniqueColumnResultMessage implements Message {
 		private static final long serialVersionUID = -4661745204456512260L;
+		ActorRef<UniqueColumnCreator.Message> worker;
 		ArrayList<String> data;
 		int tableIndex;
 		int columnIndex;
@@ -71,6 +72,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	@AllArgsConstructor
 	public static class INDTaskResultMessage implements Message {
 		private static final long serialVersionUID = -466174520123012260L;
+		ActorRef<INDFinder.Message> worker;
 		int c1TableIndex;
 		int c1ColumnIndex;
 		int c2TableIndex;
@@ -139,6 +141,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	}
 
 	private Behavior<Message> handle(UniqueColumnResultMessage message) {
+		this.getContext().stop(message.getWorker());
 		this.getContext().getLog().info("Found " + message.data.size() + " unique values in table " + message.tableIndex + " column " + message.getColumnIndex());
 		LargeMessageProxy.LargeMessage completionMessage = new DependencyMiner.UniqueColumnToMinerMessage(this.getContext().getSelf(), message.getData(), message.getTableIndex(), message.getColumnIndex());
 		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(completionMessage, DependencyWorker.dependencyMinerLargeMessageProxy));
@@ -159,6 +162,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	}
 
 	private Behavior<Message> handle(INDTaskResultMessage message) {
+		this.getContext().stop(message.getWorker());
 		this.getContext().getLog().info("second column depends on first: " + message.isDependant);
 		LargeMessageProxy.LargeMessage msg = new DependencyMiner.INDToMinerMessage(this.getContext().getSelf(), message.getC1TableIndex(),
 				message.getC1ColumnIndex(), message.getC2TableIndex(), message.getC2ColumnIndex(), message.isDependant());
