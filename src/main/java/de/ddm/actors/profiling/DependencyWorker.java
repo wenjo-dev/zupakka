@@ -1,5 +1,6 @@
 package de.ddm.actors.profiling;
 
+import akka.actor.Actor;
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
 import akka.actor.typed.javadsl.AbstractBehavior;
@@ -8,6 +9,7 @@ import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 import akka.actor.typed.receptionist.Receptionist;
 import de.ddm.actors.patterns.LargeMessageProxy;
+import de.ddm.actors.profiling.tasks.INDTask;
 import de.ddm.actors.profiling.tasks.UniqueColumnTask;
 import de.ddm.actors.profiling.tasks.WorkTask;
 import de.ddm.serialization.AkkaSerializable;
@@ -55,6 +57,27 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		int columnIndex;
 	}
 
+	@Getter
+	@NoArgsConstructor
+	@AllArgsConstructor
+	public static class FindINDTaskMessage implements Message {
+		private static final long serialVersionUID = -4661745204450012260L;
+		ActorRef<LargeMessageProxy.Message> dependencyMinerLargeMessageProxy;
+		INDTask task;
+	}
+
+	@Getter
+	@NoArgsConstructor
+	@AllArgsConstructor
+	public static class INDTaskResultMessage implements Message {
+		private static final long serialVersionUID = -466174520123012260L;
+		int c1TableIndex;
+		int c1ColumnIndex;
+		int c2TableIndex;
+		int c2ColumnIndex;
+		boolean isDependant;
+	}
+
 	////////////////////////
 	// Actor Construction //
 	////////////////////////
@@ -92,6 +115,8 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 				.onMessage(ReceptionistListingMessage.class, this::handle)
 				.onMessage(UniqueColumnTaskMessage.class, this::handle)
 				.onMessage(UniqueColumnResultMessage.class, this::handle)
+				.onMessage(FindINDTaskMessage.class, this::handle)
+				.onMessage(INDTaskResultMessage.class, this::handle)
 				.build();
 	}
 
@@ -103,7 +128,8 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	}
 
 	private Behavior<Message> handle(UniqueColumnTaskMessage message) {
-		this.getContext().getLog().info("Received " + message.getTask().getClass() + " for " +  (message.getTask()).getData().size() + " entries.");
+		this.getContext().getLog().info("Received " + String.valueOf(message.getTask().getClass())
+				.substring(String.valueOf(message.getTask().getClass()).lastIndexOf(".")) + " for " +  (message.getTask()).getData().size() + " entries.");
 		DependencyWorker.dependencyMinerLargeMessageProxy = message.getDependencyMinerLargeMessageProxy();
 		ActorRef<UniqueColumnCreator.Message> actor = getContext().spawn(UniqueColumnCreator.create(message.getTask()),
 				UniqueColumnCreator.DEFAULT_NAME + "_" + (message.getTask()).getTableIndex()
@@ -116,6 +142,25 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		this.getContext().getLog().info("Found " + message.data.size() + " unique values in table " + message.tableIndex + " column " + message.getColumnIndex());
 		LargeMessageProxy.LargeMessage completionMessage = new DependencyMiner.UniqueColumnToMinerMessage(this.getContext().getSelf(), message.getData(), message.getTableIndex(), message.getColumnIndex());
 		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(completionMessage, DependencyWorker.dependencyMinerLargeMessageProxy));
+		return this;
+	}
+
+	private Behavior<Message> handle(FindINDTaskMessage message) {
+		this.getContext().getLog().info("Received " + String.valueOf(message.getTask().getClass())
+				.substring(String.valueOf(message.getTask().getClass()).lastIndexOf(".")) + " for T" +
+				message.task.getC1TableIndex() + "C" + message.task.getC1ColumnIndex() + " and T" +
+				message.task.getC2TableIndex() + "C" + message.task.getC2ColumnIndex());
+		DependencyWorker.dependencyMinerLargeMessageProxy = message.getDependencyMinerLargeMessageProxy();
+		ActorRef<INDFinder.Message> actor = getContext().spawn(INDFinder.create(message.getTask()), INDFinder.DEFAULT_NAME);
+		actor.tell(new INDFinder.FindINDMessage(this.getContext().getSelf()));
+		return this;
+	}
+
+	private Behavior<Message> handle(INDTaskResultMessage message) {
+		this.getContext().getLog().info("second column depends on first: " + message.isDependant);
+		LargeMessageProxy.LargeMessage msg = new DependencyMiner.INDToMinerMessage(this.getContext().getSelf(), message.getC1TableIndex(),
+				message.getC1ColumnIndex(), message.getC2TableIndex(), message.getC2ColumnIndex(), message.isDependant());
+		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, DependencyWorker.dependencyMinerLargeMessageProxy));
 		return this;
 	}
 }

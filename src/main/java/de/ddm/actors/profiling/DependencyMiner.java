@@ -88,6 +88,19 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		int columnIndex;
 	}
 
+	@Getter
+	@NoArgsConstructor
+	@AllArgsConstructor
+	public static class INDToMinerMessage implements Message {
+		private static final long serialVersionUID = -7642422259672222598L;
+		ActorRef<DependencyWorker.Message> dependencyWorker;
+		int c1TableIndex;
+		int c1ColumnIndex;
+		int c2TableIndex;
+		int c2ColumnIndex;
+		boolean isDependant;
+	}
+
 	////////////////////////
 	// Actor Construction //
 	////////////////////////
@@ -160,6 +173,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 				.onMessage(RegistrationMessage.class, this::handle)
 				.onMessage(ColumnCreationMessage.class, this::handle)
 				.onMessage(UniqueColumnToMinerMessage.class, this::handle)
+				.onMessage(INDToMinerMessage.class, this::handle)
 				.onSignal(Terminated.class, this::handle)
 				.build();
 	}
@@ -259,6 +273,21 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		return this;
 	}
 
+	private Behavior<Message> handle(INDToMinerMessage message) {
+		if(message.isDependant()){
+			this.getContext().getLog().info("Received IND: " + this.inputFiles[message.c1TableIndex] + "." + this.headerLines[message.c1TableIndex][message.c1ColumnIndex] + " -> "
+					+ this.inputFiles[message.c2TableIndex] + "." + this.headerLines[message.c2TableIndex][message.c2ColumnIndex]);
+		} else {
+			this.getContext().getLog().info("No IND was found between " + this.inputFiles[message.c1TableIndex] + "." + this.headerLines[message.c1TableIndex][message.c1ColumnIndex] + " and "
+					+ this.inputFiles[message.c2TableIndex] + "." + this.headerLines[message.c2TableIndex][message.c2ColumnIndex]);
+		}
+		this.busyWorkers.remove(message.getDependencyWorker());
+		this.idleWorkers.add(message.getDependencyWorker());
+		// TODO: IF WORKLIST EMPTY -> SEARCH MORE IN DIFFERENT TABLES
+		assignTasksToWorkers();
+		return this;
+	}
+
 	private void end() {
 		this.resultCollector.tell(new ResultCollector.FinalizeMessage());
 		long discoveryTime = System.currentTimeMillis() - this.startTime;
@@ -286,10 +315,12 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			if(task.getClass().equals(UniqueColumnTask.class)){
 				LargeMessageProxy.LargeMessage msg = new DependencyWorker.UniqueColumnTaskMessage(this.largeMessageProxy, ((UniqueColumnTask)task));
 				this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, this.workers.get(worker)));
-				this.getContext().getLog().info("Assigning Task '" + task.getClass() + "' to worker");
 			} else if(task.getClass().equals(INDTask.class)) {
-				// TODO message stuff
+				LargeMessageProxy.LargeMessage msg = new DependencyWorker.FindINDTaskMessage(this.largeMessageProxy, ((INDTask) task));
+				this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, this.workers.get(worker)));
 			}
+			this.getContext().getLog().info("Assigning Task '" + String.valueOf(task.getClass())
+					.substring(String.valueOf(task.getClass()).lastIndexOf(".")) + "' to worker");
 		}
 	}
 }
