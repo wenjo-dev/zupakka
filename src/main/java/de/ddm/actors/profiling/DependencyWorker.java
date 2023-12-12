@@ -129,7 +129,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 
 	private Behavior<Message> handle(UniqueColumnTaskMessage message) {
 		this.getContext().getLog().info("Received " + String.valueOf(message.getTask().getClass())
-				.substring(String.valueOf(message.getTask().getClass()).lastIndexOf(".")) + " for " +  (message.getTask()).getData().size() + " entries.");
+				.substring(String.valueOf(message.getTask().getClass()).lastIndexOf(".") + 1) + " for " +  (message.getTask()).getData().size() + " entries.");
 		DependencyWorker.dependencyMinerLargeMessageProxy = message.getDependencyMinerLargeMessageProxy();
 		ActorRef<UniqueColumnCreator.Message> actor = getContext().spawn(UniqueColumnCreator.create(message.getTask()),
 				UniqueColumnCreator.DEFAULT_NAME + "_" + (message.getTask()).getTableIndex()
@@ -147,11 +147,13 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 
 	private Behavior<Message> handle(FindINDTaskMessage message) {
 		this.getContext().getLog().info("Received " + String.valueOf(message.getTask().getClass())
-				.substring(String.valueOf(message.getTask().getClass()).lastIndexOf(".")) + " for T" +
+				.substring(String.valueOf(message.getTask().getClass()).lastIndexOf(".") + 1) + " for T" +
 				message.task.getC1TableIndex() + "C" + message.task.getC1ColumnIndex() + " and T" +
 				message.task.getC2TableIndex() + "C" + message.task.getC2ColumnIndex());
 		DependencyWorker.dependencyMinerLargeMessageProxy = message.getDependencyMinerLargeMessageProxy();
-		ActorRef<INDFinder.Message> actor = getContext().spawn(INDFinder.create(message.getTask()), INDFinder.DEFAULT_NAME);
+		ActorRef<INDFinder.Message> actor = getContext().spawn(INDFinder.create(message.getTask()), INDFinder.DEFAULT_NAME + "_T" +
+			message.getTask().getC1TableIndex() + "C" + message.getTask().getC1ColumnIndex() + ":T" +
+				message.getTask().getC2TableIndex() + "C" + message.getTask().getC2ColumnIndex());
 		actor.tell(new INDFinder.FindINDMessage(this.getContext().getSelf()));
 		return this;
 	}

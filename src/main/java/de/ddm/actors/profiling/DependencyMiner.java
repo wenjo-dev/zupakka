@@ -319,8 +319,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 				LargeMessageProxy.LargeMessage msg = new DependencyWorker.FindINDTaskMessage(this.largeMessageProxy, ((INDTask) task));
 				this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, this.workers.get(worker)));
 			}
-			this.getContext().getLog().info("Assigning Task '" + String.valueOf(task.getClass())
-					.substring(String.valueOf(task.getClass()).lastIndexOf(".")) + "' to worker");
+			this.getContext().getLog().info("Assigning '" + String.valueOf(task.getClass())
+					.substring(String.valueOf(task.getClass()).lastIndexOf(".") + 1) + "' to worker");
 		}
 	}
 }
