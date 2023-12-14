@@ -56,7 +56,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		ArrayList<String> data;
 		int tableIndex;
 		int columnIndex;
-		UniqueColumnTask originalTask;
+		int taskId;
 	}
 
 	@Getter
@@ -79,7 +79,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		int c2TableIndex;
 		int c2ColumnIndex;
 		boolean isDependant;
-		WorkTask originalTask;
+		int taskId;
 	}
 
 	////////////////////////
@@ -145,7 +145,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	private Behavior<Message> handle(UniqueColumnResultMessage message) {
 		this.getContext().stop(message.getWorker());
 		this.getContext().getLog().info("Found " + message.data.size() + " unique values in table " + message.tableIndex + " column " + message.getColumnIndex());
-		LargeMessageProxy.LargeMessage completionMessage = new DependencyMiner.UniqueColumnToMinerMessage(this.getContext().getSelf(), message.getData(), message.getTableIndex(), message.getColumnIndex(), message.getOriginalTask());
+		LargeMessageProxy.LargeMessage completionMessage = new DependencyMiner.UniqueColumnToMinerMessage(this.getContext().getSelf(), message.getData(), message.getTableIndex(), message.getColumnIndex(), message.taskId);
 		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(completionMessage, DependencyWorker.dependencyMinerLargeMessageProxy));
 		return this;
 	}
@@ -167,7 +167,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		this.getContext().stop(message.getWorker());
 		this.getContext().getLog().info("second column depends on first: " + message.isDependant);
 		LargeMessageProxy.LargeMessage msg = new DependencyMiner.INDToMinerMessage(this.getContext().getSelf(), message.getC1TableIndex(),
-				message.getC1ColumnIndex(), message.getC2TableIndex(), message.getC2ColumnIndex(), message.isDependant(), message.getOriginalTask());
+				message.getC1ColumnIndex(), message.getC2TableIndex(), message.getC2ColumnIndex(), message.isDependant(), message.taskId);
 		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, DependencyWorker.dependencyMinerLargeMessageProxy));
 		return this;
 	}

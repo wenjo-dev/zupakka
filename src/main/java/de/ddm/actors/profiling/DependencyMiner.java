@@ -88,7 +88,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		ArrayList<String> data;
 		int tableIndex;
 		int columnIndex;
-		WorkTask originalTask;
+		int taskId;
 	}
 
 	@Getter
@@ -102,7 +102,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		int c2TableIndex;
 		int c2ColumnIndex;
 		boolean isDependant;
-		WorkTask originalTask;
+		int taskId;
 	}
 
 	////////////////////////
@@ -157,7 +157,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	private final List<ActorRef<DependencyWorker.Message>> idleWorkers;
 	// custom
 	private List<WorkTask> workList = new ArrayList<>();
-	private Map<WorkTask, ActorRef<DependencyWorker.Message>> busyWorkList = new HashMap<>();
+	private Map<Integer, ActorRef<DependencyWorker.Message>> busyWorkList = new HashMap<>();
 	private List<ActorRef<ColumnCreator.Message>> columnCreators;
 
 	private int filesRead = 0;
@@ -303,7 +303,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		this.columns.get(message.tableIndex).put(message.columnIndex, message.data);
 		this.busyWorkers.remove(message.getDependencyWorker());
 		this.idleWorkers.add(message.getDependencyWorker());
-		this.busyWorkList.remove(message.originalTask);
+		this.busyWorkList.remove(message.taskId);
 
 		setColumnReady(message.tableIndex, message.columnIndex);
 
@@ -336,7 +336,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		}
 		this.busyWorkers.remove(message.getDependencyWorker());
 		this.idleWorkers.add(message.getDependencyWorker());
-		this.busyWorkList.remove(message.originalTask);
+		this.busyWorkList.remove(message.taskId);
 
 		assignTasksToWorkers();
 
@@ -363,6 +363,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	}
 
 	private void assignTasksToWorkers(){
+		this.getContext().getLog().info(String.valueOf("BUSY TASKS: " + this.busyWorkList.size()));
 		while (!this.workList.isEmpty() && !this.idleWorkers.isEmpty()){
 			this.getContext().getLog().info("unique column tasks: "+this.workList.stream().filter(task -> task instanceof UniqueColumnTask).count() + " and " +
 					"IND tasks: "+this.workList.stream().filter(task -> task instanceof INDTask).count());
@@ -372,7 +373,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			this.idleWorkers.remove(0);
 			this.busyWorkers.add(worker);
 
-			this.busyWorkList.put(task, worker);
+			this.busyWorkList.put(task.id, worker);
 
 			int dataAmount = 0;
 			if(task.getClass().equals(UniqueColumnTask.class)){
