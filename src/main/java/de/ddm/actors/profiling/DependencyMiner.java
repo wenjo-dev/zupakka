@@ -23,6 +23,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import scala.Array;
 import scala.Int;
 
 import java.io.File;
@@ -323,7 +324,17 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		}
 		this.busyWorkers.remove(message.getDependencyWorker());
 		this.idleWorkers.add(message.getDependencyWorker());
-		// TODO: IF WORKLIST EMPTY -> SEARCH MORE IN DIFFERENT TABLES
+
+		if(message.isDependant()){
+			InclusionDependency ind = new InclusionDependency(this.inputFiles[message.getC2TableIndex()],
+					new String[]{this.headerLines[message.getC2TableIndex()][message.c2ColumnIndex]},
+					this.inputFiles[message.getC1TableIndex()],
+					new String[]{this.headerLines[message.getC1TableIndex()][message.c1ColumnIndex]});
+			ArrayList<InclusionDependency> resultList = new ArrayList<>();
+			resultList.add(ind);
+			this.resultCollector.tell(new ResultCollector.ResultMessage(resultList));
+		}
+
 		assignTasksToWorkers();
 		return this;
 	}
