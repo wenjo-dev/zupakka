@@ -353,15 +353,20 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			ActorRef<DependencyWorker.Message> worker = this.idleWorkers.get(0);
 			this.idleWorkers.remove(0);
 			this.busyWorkers.add(worker);
+
+			int dataAmount = 0;
 			if(task.getClass().equals(UniqueColumnTask.class)){
 				LargeMessageProxy.LargeMessage msg = new DependencyWorker.UniqueColumnTaskMessage(this.largeMessageProxy, ((UniqueColumnTask)task));
 				this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, this.workers.get(worker)));
+				dataAmount += ((UniqueColumnTask) task).getData().size();
 			} else if(task.getClass().equals(INDTask.class)) {
 				LargeMessageProxy.LargeMessage msg = new DependencyWorker.FindINDTaskMessage(this.largeMessageProxy, ((INDTask) task));
 				this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, this.workers.get(worker)));
+				dataAmount += ((INDTask)task).getC1().size() + ((INDTask)task).getC2().size();
 			}
 			this.getContext().getLog().info("Assigning '" + String.valueOf(task.getClass())
-					.substring(String.valueOf(task.getClass()).lastIndexOf(".") + 1) + "' to worker");
+					.substring(String.valueOf(task.getClass()).lastIndexOf(".") + 1) + "' with " +
+					dataAmount + " entries to worker");
 		}
 	}
 }
