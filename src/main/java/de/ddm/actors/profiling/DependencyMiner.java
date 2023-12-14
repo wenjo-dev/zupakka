@@ -88,6 +88,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		ArrayList<String> data;
 		int tableIndex;
 		int columnIndex;
+		WorkTask originalTask;
 	}
 
 	@Getter
@@ -101,6 +102,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		int c2TableIndex;
 		int c2ColumnIndex;
 		boolean isDependant;
+		WorkTask originalTask;
 	}
 
 	////////////////////////
@@ -155,6 +157,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	private final List<ActorRef<DependencyWorker.Message>> idleWorkers;
 	// custom
 	private List<WorkTask> workList = new ArrayList<>();
+	private Map<WorkTask, ActorRef<DependencyWorker.Message>> busyWorkList = new HashMap<>();
 	private List<ActorRef<ColumnCreator.Message>> columnCreators;
 
 	private int filesRead = 0;
@@ -163,6 +166,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	private final ArrayList<Map<Integer, ArrayList<String>>> columns = new ArrayList<>();
 
 	private final ArrayList<Integer[]> pairs = new ArrayList<>();
+
 
 
 	////////////////////
@@ -299,6 +303,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		this.columns.get(message.tableIndex).put(message.columnIndex, message.data);
 		this.busyWorkers.remove(message.getDependencyWorker());
 		this.idleWorkers.add(message.getDependencyWorker());
+		this.busyWorkList.remove(message.originalTask);
 
 		setColumnReady(message.tableIndex, message.columnIndex);
 
@@ -321,11 +326,6 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		if(message.isDependant()){
 			this.getContext().getLog().info("Received IND: " + this.inputFiles[message.c1TableIndex].getName() + "." + this.headerLines[message.c1TableIndex][message.c1ColumnIndex] + " -> "
 					+ this.inputFiles[message.c2TableIndex].getName() + "." + this.headerLines[message.c2TableIndex][message.c2ColumnIndex]);
-		}
-		this.busyWorkers.remove(message.getDependencyWorker());
-		this.idleWorkers.add(message.getDependencyWorker());
-
-		if(message.isDependant()){
 			InclusionDependency ind = new InclusionDependency(this.inputFiles[message.getC2TableIndex()],
 					new String[]{this.headerLines[message.getC2TableIndex()][message.c2ColumnIndex]},
 					this.inputFiles[message.getC1TableIndex()],
@@ -334,8 +334,15 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			resultList.add(ind);
 			this.resultCollector.tell(new ResultCollector.ResultMessage(resultList));
 		}
+		this.busyWorkers.remove(message.getDependencyWorker());
+		this.idleWorkers.add(message.getDependencyWorker());
+		this.busyWorkList.remove(message.originalTask);
 
 		assignTasksToWorkers();
+
+		if(this.workList.isEmpty() && this.busyWorkList.isEmpty())
+			end();
+
 		return this;
 	}
 
@@ -364,6 +371,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			ActorRef<DependencyWorker.Message> worker = this.idleWorkers.get(0);
 			this.idleWorkers.remove(0);
 			this.busyWorkers.add(worker);
+
+			this.busyWorkList.put(task, worker);
 
 			int dataAmount = 0;
 			if(task.getClass().equals(UniqueColumnTask.class)){

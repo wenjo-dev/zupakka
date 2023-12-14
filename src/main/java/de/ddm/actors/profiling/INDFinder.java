@@ -86,7 +86,7 @@ public class INDFinder extends AbstractBehavior<INDFinder.Message> {
             }
         }
         message.getWorker().tell(new DependencyWorker.INDTaskResultMessage(this.getContext().getSelf(), task.getC1TableIndex(), task.getC1ColumnIndex(),
-                task.getC2TableIndex(), task.getC2ColumnIndex(), isDependant));
+                task.getC2TableIndex(), task.getC2ColumnIndex(), isDependant, this.task));
 
         return this;
     }
