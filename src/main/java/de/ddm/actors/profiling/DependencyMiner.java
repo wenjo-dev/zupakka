@@ -23,6 +23,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import scala.Int;
 
 import java.io.File;
 import java.util.*;
@@ -156,7 +157,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	private List<ActorRef<ColumnCreator.Message>> columnCreators;
 
 	private int filesRead = 0;
-	private final ArrayList<String[]>[] originalFileContents;
+	private ArrayList<String[]>[] originalFileContents;
 	// all columns with their origin [table-index][column-index] as key
 	private final ArrayList<Map<Integer, ArrayList<String>>> columns = new ArrayList<>();
 
@@ -210,6 +211,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 					"from table " + message.getId() + ". Spawning ColumnCreator Actor");
 			this.columnCreators.add(getContext().spawn(ColumnCreator.create(message.getId(), this.originalFileContents[message.getId()]), ColumnCreator.DEFAULT_NAME + "_" + message.getId()));
 			this.columnCreators.get(this.columnCreators.size() - 1).tell(new ColumnCreator.CreateColumnsMessage(this.getContext().getSelf()));
+			this.getContext().stop(this.inputReaders.get(message.getId()));
 		}
 		return this;
 	}
@@ -249,6 +251,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	private Behavior<Message> handle(ColumnCreationMessage message) {
 		this.getContext().getLog().info("Received " + message.taskList.size() + " columns from table " + message.taskList.get(0).getTableIndex());
 		this.columnCreators.remove(message.columnCreator);
+		this.getContext().stop(message.getColumnCreator());
 		this.filesRead += 1;
 		// save columns
 		for (UniqueColumnTask t: message.getTaskList()) {
@@ -256,8 +259,10 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		}
 		this.workList.addAll(message.getTaskList());
 
-		if(this.filesRead == this.inputFiles.length)
+		if(this.filesRead == this.inputFiles.length) {
+			this.originalFileContents = null;
 			createPairCandidates();
+		}
 
 		assignTasksToWorkers();
 		return this;
