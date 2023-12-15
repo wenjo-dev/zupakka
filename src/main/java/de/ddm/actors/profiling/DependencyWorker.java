@@ -173,7 +173,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		}
 
 		LargeMessageProxy.LargeMessage msg = new DependencyMiner.INDToMinerMessage(this.getContext().getSelf(), message.getC1TableIndex(),
-				message.getC1ColumnIndex(), message.getC2TableIndex(), message.getC2ColumnIndex(), message.isDependantFirst, message.isDependantSecond(), message.taskId);
+				message.getC1ColumnIndex(), message.getC2TableIndex(), message.getC2ColumnIndex(), message.isDependantFirst, message.isDependantSecond, message.taskId);
 		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, DependencyWorker.dependencyMinerLargeMessageProxy));
 		return this;
 	}
