@@ -170,6 +170,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 	// test
 	private final ArrayList<InclusionDependency> allINDs = new ArrayList<>();
+	private int indTasks = 0;
 
 
 	////////////////////
@@ -251,6 +252,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 						this.headerLines[pair[0]][pair[1]] + "] c [" + this.headerLines[pair[2]][pair[3]] + "]";
 				this.workList.add(new INDTask(this.columns.get(pair[0]).get(pair[1]), this.columns.get(pair[2]).get(pair[3]),
 						pair[0], pair[1], pair[2], pair[3], name));
+				// test
+				this.indTasks += 1;
 				readyPairs.add(pair);
 			}
 		}
@@ -357,6 +360,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 		if(this.workList.isEmpty() && this.busyWorkList.isEmpty()) {
 			this.getContext().getLog().info("Number of INDs found total: "+this.allINDs.size());
+			this.getContext().getLog().info("Number of assigned IND tasks during run: "+this.indTasks);
+			this.getContext().getLog().info("Number of remaining pairs: "+this.pairs.size());
 			end();
 		}
 
