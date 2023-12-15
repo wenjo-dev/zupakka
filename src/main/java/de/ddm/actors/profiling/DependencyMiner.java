@@ -101,7 +101,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		int c1ColumnIndex;
 		int c2TableIndex;
 		int c2ColumnIndex;
-		boolean isDependant;
+		boolean isDependantFirst;
+		boolean isDependantSecond;
 		int taskId;
 	}
 
@@ -325,16 +326,28 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	}
 
 	private Behavior<Message> handle(INDToMinerMessage message) {
-		if(message.isDependant()){
-			this.getContext().getLog().info("Received IND: " + this.inputFiles[message.c1TableIndex].getName() + "." + this.headerLines[message.c1TableIndex][message.c1ColumnIndex] + " -> "
-					+ this.inputFiles[message.c2TableIndex].getName() + "." + this.headerLines[message.c2TableIndex][message.c2ColumnIndex]);
-			InclusionDependency ind = new InclusionDependency(this.inputFiles[message.getC2TableIndex()],
-					new String[]{this.headerLines[message.getC2TableIndex()][message.c2ColumnIndex]},
-					this.inputFiles[message.getC1TableIndex()],
-					new String[]{this.headerLines[message.getC1TableIndex()][message.c1ColumnIndex]});
+		if(message.isDependantFirst() || message.isDependantSecond()){
 			ArrayList<InclusionDependency> resultList = new ArrayList<>();
-			resultList.add(ind);
-			this.allINDs.add(ind);
+			if (message.isDependantFirst){
+				this.getContext().getLog().info("Received IND: " + this.inputFiles[message.c1TableIndex].getName() + "." + this.headerLines[message.c1TableIndex][message.c1ColumnIndex] + " -> "
+						+ this.inputFiles[message.c2TableIndex].getName() + "." + this.headerLines[message.c2TableIndex][message.c2ColumnIndex]);
+				InclusionDependency ind = new InclusionDependency(this.inputFiles[message.getC2TableIndex()],
+						new String[]{this.headerLines[message.getC2TableIndex()][message.c2ColumnIndex]},
+						this.inputFiles[message.getC1TableIndex()],
+						new String[]{this.headerLines[message.getC1TableIndex()][message.c1ColumnIndex]});
+				resultList.add(ind);
+				this.allINDs.add(ind);
+			} else if (message.isDependantSecond){
+				this.getContext().getLog().info("Received IND: " + this.inputFiles[message.c2TableIndex].getName() + "." + this.headerLines[message.c2TableIndex][message.c2ColumnIndex] + " -> "
+						+ this.inputFiles[message.c1TableIndex].getName() + "." + this.headerLines[message.c1TableIndex][message.c1ColumnIndex]);
+				InclusionDependency ind = new InclusionDependency(this.inputFiles[message.getC1TableIndex()],
+						new String[]{this.headerLines[message.getC1TableIndex()][message.c1ColumnIndex]},
+						this.inputFiles[message.getC2TableIndex()],
+						new String[]{this.headerLines[message.getC2TableIndex()][message.c2ColumnIndex]});
+				resultList.add(ind);
+				this.allINDs.add(ind);
+			}
+
 			this.resultCollector.tell(new ResultCollector.ResultMessage(resultList));
 		}
 		this.busyWorkers.remove(message.getDependencyWorker());
