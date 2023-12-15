@@ -288,23 +288,12 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	}
 
 	private void createPairsFromTables(int table1, int table2){
-		if(this.headerLines[table1].length <= this.headerLines[table2].length) {
-			for (int i = 0; i < this.headerLines[table1].length; i++){
-				for (int j = i; j < this.headerLines[table2].length;j++){
-					if(table1 == table2 && i == j){
-						continue;
-					}
-					this.pairs.add(new Integer[]{table1, i, table2, j, 0, 0});
+		for (int i = 0; i < this.headerLines[table1].length; i++){
+			for (int j = 0; j < this.headerLines[table2].length;j++){
+				if(table1 == table2 && i >= j){
+					continue;
 				}
-			}
-		} else {
-			for (int i = 0; i < this.headerLines[table2].length; i++){
-				for (int j = i; j < this.headerLines[table1].length;j++){
-					if(table1 == table2 && i == j){
-						continue;
-					}
-					this.pairs.add(new Integer[]{table2, i, table1, j, 0, 0});
-				}
+				this.pairs.add(new Integer[]{table1, i, table2, j, 0, 0});
 			}
 		}
 	}
