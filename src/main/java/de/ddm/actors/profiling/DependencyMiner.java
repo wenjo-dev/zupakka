@@ -344,7 +344,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 						new String[]{this.headerLines[message.getC1TableIndex()][message.c1ColumnIndex]});
 				resultList.add(ind);
 				this.allINDs.add(ind);
-			} else if (message.isDependantSecond){
+			}
+			if (message.isDependantSecond){
 				this.getContext().getLog().info("Received IND: " + this.inputFiles[message.c2TableIndex].getName() + "." + this.headerLines[message.c2TableIndex][message.c2ColumnIndex] + " -> "
 						+ this.inputFiles[message.c1TableIndex].getName() + "." + this.headerLines[message.c1TableIndex][message.c1ColumnIndex]);
 				InclusionDependency ind = new InclusionDependency(this.inputFiles[message.getC1TableIndex()],
