@@ -171,8 +171,6 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	// test
 	private final ArrayList<InclusionDependency> allINDs = new ArrayList<>();
 	private int indTasks = 0;
-	private int columnsReady = 0;
-	private int createINDcalls = 0;
 
 
 	////////////////////
@@ -315,14 +313,12 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		setColumnReady(message.tableIndex, message.columnIndex);
 
 		createINDTasks();
-		this createINDcalls += 1;
 
 		assignTasksToWorkers();
 		return this;
 	}
 
 	private void setColumnReady(int t, int c) {
-		this.columnsReady += 1;
 		for(Integer[] pair: this.pairs) {
 			if (pair[0] == t && pair[1] == c)
 				pair[4] = 1;
@@ -366,8 +362,12 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			this.getContext().getLog().info("Number of INDs found total: "+this.allINDs.size());
 			this.getContext().getLog().info("Number of assigned IND tasks during run: "+this.indTasks);
 			this.getContext().getLog().info("Number of remaining pairs: "+this.pairs.size());
-			this.getContext().getLog().info("no of set columns ready: "+this.columnsReady);
-			this.getContext().getLog().info("no create ind method calls : "+this.createINDcalls);
+			ArrayList<Integer[]> notReadyPairs = new ArrayList<>();
+			for(Integer[] pair: this.pairs) {
+				if(pair[4] == 0 || pair[5] == 0)
+					notReadyPairs.add(pair);
+			}
+			this.getContext().getLog().info("Number of pairs where at least one column not set ready: "+notReadyPairs.size());
 			end();
 		}
 
