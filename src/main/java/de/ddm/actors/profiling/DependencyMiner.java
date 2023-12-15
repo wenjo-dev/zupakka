@@ -200,8 +200,13 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		return this;
 	}
 
+	static int headerLinesRead = 0;
 	private Behavior<Message> handle(HeaderMessage message) {
 		this.headerLines[message.getId()] = message.getHeader();
+		DependencyMiner.headerLinesRead++;
+		if(DependencyMiner.headerLinesRead == this.inputFiles.length){
+			createPairCandidates();
+		}
 		return this;
 	}
 
@@ -221,6 +226,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			this.columnCreators.add(getContext().spawn(ColumnCreator.create(message.getId(), this.originalFileContents[message.getId()]), ColumnCreator.DEFAULT_NAME + "_" + message.getId()));
 			this.columnCreators.get(this.columnCreators.size() - 1).tell(new ColumnCreator.CreateColumnsMessage(this.getContext().getSelf()));
 			this.getContext().stop(this.inputReaders.get(message.getId()));
+
 		}
 		return this;
 	}
@@ -274,7 +280,6 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 		if(this.filesRead == this.inputFiles.length) {
 			this.originalFileContents = null;
-			createPairCandidates();
 		}
 
 		assignTasksToWorkers();
