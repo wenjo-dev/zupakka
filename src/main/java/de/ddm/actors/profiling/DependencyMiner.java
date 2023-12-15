@@ -273,7 +273,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		return this;
 	}
 
-	private void createPairCandidates() {
+	private void createPairCandidates2() {
 		for(int i = 0; i < this.headerLines.length; i++) {
 			for(int j = 0; j < this.headerLines[i].length; j++) {
 				// loop through columns of current table
@@ -291,6 +291,35 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 					for(int l = 0; l < this.headerLines[k].length; l++) {
 						this.pairs.add(new Integer[]{i, j, k, l, 0, 0});
 					}
+				}
+			}
+		}
+	}
+
+	private void createPairCandidates(){
+		for (int i = 0; i < this.headerLines.length;i++){
+			for (int j = 0; j < this.headerLines.length; j++){
+				createPairsFromTables(i, j, true);
+			}
+		}
+	}
+
+	private void createPairsFromTables(int table1, int table2, boolean bothDirections){
+		for (int i = 0; i < this.headerLines[table1].length; i++){
+			for (int j = 0; j < this.headerLines[table2].length;j++){
+				if(table1 == table2 && i == j){
+					continue;
+				}
+				this.pairs.add(new Integer[]{table1, i, table2, j, 0, 0});
+			}
+		}
+		if(bothDirections){
+			for (int i = 0; i < this.headerLines[table2].length; i++){
+				for (int j = 0; j < this.headerLines[table1].length;j++){
+					if(table1 == table2 && i == j){
+						continue;
+					}
+					this.pairs.add(new Integer[]{table2, i, table1, j, 0, 0});
 				}
 			}
 		}
