@@ -16,6 +16,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class INDFinder extends AbstractBehavior<INDFinder.Message> {
 
@@ -66,7 +67,7 @@ public class INDFinder extends AbstractBehavior<INDFinder.Message> {
                 .build();
     }
 
-    private Behavior<INDFinder.Message> handle(INDFinder.FindINDMessage message) {
+    private Behavior<INDFinder.Message> handle2(INDFinder.FindINDMessage message) {
         double lastLogTime = System.currentTimeMillis();
 
         boolean isDependant = true;
@@ -85,6 +86,31 @@ public class INDFinder extends AbstractBehavior<INDFinder.Message> {
                 break;
             }
         }
+        message.getWorker().tell(new DependencyWorker.INDTaskResultMessage(this.getContext().getSelf(), task.getC1TableIndex(), task.getC1ColumnIndex(),
+                task.getC2TableIndex(), task.getC2ColumnIndex(), isDependant, this.task.id));
+
+        return this;
+    }
+
+    private Behavior<INDFinder.Message> handle(INDFinder.FindINDMessage message) {
+        double lastLogTime = System.currentTimeMillis();
+
+        boolean isDependant = true;
+        HashMap<String, Boolean> firstColumn = new HashMap<>();
+        for (int i = 0; i < this.task.getC1().size(); i++){
+            firstColumn.put(this.task.getC1().get(i), true);
+        }
+        for (int i = 0; i < this.task.getC2().size(); i++){
+            if(System.currentTimeMillis() - lastLogTime >= 1000) {
+                this.getContext().getLog().info((Math.round((double)i / (double)this.task.getC2().size() * 10000.0) / 100.0)+"% checked");
+                lastLogTime = System.currentTimeMillis();
+            }
+            if(firstColumn.get(this.task.getC2().get(i)) == null){
+                isDependant = false;
+                break;
+            }
+        }
+
         message.getWorker().tell(new DependencyWorker.INDTaskResultMessage(this.getContext().getSelf(), task.getC1TableIndex(), task.getC1ColumnIndex(),
                 task.getC2TableIndex(), task.getC2ColumnIndex(), isDependant, this.task.id));
 
