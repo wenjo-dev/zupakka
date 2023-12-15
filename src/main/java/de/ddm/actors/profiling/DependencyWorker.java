@@ -152,9 +152,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 
 	private Behavior<Message> handle(FindINDTaskMessage message) {
 		this.getContext().getLog().info("Received " + String.valueOf(message.getTask().getClass())
-				.substring(String.valueOf(message.getTask().getClass()).lastIndexOf(".") + 1) + " for T" +
-				message.task.getC1TableIndex() + "C" + message.task.getC1ColumnIndex() + " and T" +
-				message.task.getC2TableIndex() + "C" + message.task.getC2ColumnIndex());
+				.substring(String.valueOf(message.getTask().getClass()).lastIndexOf(".") + 1) + ": " + message.getTask().getName());
 		DependencyWorker.dependencyMinerLargeMessageProxy = message.getDependencyMinerLargeMessageProxy();
 		ActorRef<INDFinder.Message> actor = getContext().spawn(INDFinder.create(message.getTask()), INDFinder.DEFAULT_NAME + "_T" +
 			message.getTask().getC1TableIndex() + "C" + message.getTask().getC1ColumnIndex() + ":T" +

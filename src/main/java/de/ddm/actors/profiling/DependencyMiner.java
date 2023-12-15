@@ -167,6 +167,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 	private final ArrayList<Integer[]> pairs = new ArrayList<>();
 
+	// test
+	private final ArrayList<InclusionDependency> allINDs = new ArrayList<>();
 
 
 	////////////////////
@@ -244,8 +246,10 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		ArrayList<Integer[]> readyPairs = new ArrayList<>();
 		for(Integer[] pair: this.pairs) {
 			if(pair[4] == 1 && pair[5] == 1) {
+				String name = this.inputFiles[pair[0]].getName() + " -> " + this.inputFiles[pair[2]].getName() + ": [" +
+						this.headerLines[pair[0]][pair[1]] + "] c [" + this.headerLines[pair[2]][pair[3]] + "]";
 				this.workList.add(new INDTask(this.columns.get(pair[0]).get(pair[1]), this.columns.get(pair[2]).get(pair[3]),
-						pair[0], pair[1], pair[2], pair[3]));
+						pair[0], pair[1], pair[2], pair[3], name));
 				readyPairs.add(pair);
 			}
 		}
@@ -328,6 +332,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 					new String[]{this.headerLines[message.getC1TableIndex()][message.c1ColumnIndex]});
 			ArrayList<InclusionDependency> resultList = new ArrayList<>();
 			resultList.add(ind);
+			this.allINDs.add(ind);
 			this.resultCollector.tell(new ResultCollector.ResultMessage(resultList));
 		}
 		this.busyWorkers.remove(message.getDependencyWorker());
@@ -336,8 +341,10 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 		assignTasksToWorkers();
 
-		if(this.workList.isEmpty() && this.busyWorkList.isEmpty())
+		if(this.workList.isEmpty() && this.busyWorkList.isEmpty()) {
+			this.getContext().getLog().info("Number of INDs found total: "+this.allINDs.size());
 			end();
+		}
 
 		return this;
 	}
