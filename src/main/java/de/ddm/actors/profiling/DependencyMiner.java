@@ -279,7 +279,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 	private void createPairCandidates(){
 		for (int i = 0; i < this.headerLines.length;i++){
-			for (int j = 0; j < this.headerLines.length; j++){
+			// create only one direction
+			for (int j = i; j < this.headerLines.length; j++){
 				createPairsFromTables(i, j);
 			}
 		}
@@ -287,7 +288,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 	private void createPairsFromTables(int table1, int table2){
 		for (int i = 0; i < this.headerLines[table1].length; i++){
-			for (int j = 0; j < this.headerLines[table2].length;j++){
+			// only create one direction
+			for (int j = i; j < this.headerLines[table2].length;j++){
 				if(table1 == table2 && i == j){
 					continue;
 				}
