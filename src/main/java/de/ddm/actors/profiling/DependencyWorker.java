@@ -78,7 +78,8 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		int c1ColumnIndex;
 		int c2TableIndex;
 		int c2ColumnIndex;
-		boolean isDependant;
+		boolean isDependantFirst;
+		boolean isDependantSecond;
 		int taskId;
 	}
 
@@ -163,7 +164,14 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 
 	private Behavior<Message> handle(INDTaskResultMessage message) {
 		this.getContext().stop(message.getWorker());
-		this.getContext().getLog().info("second column depends on first: " + message.isDependant);
+		if(!message.isDependantFirst && !message.isDependantSecond){
+			this.getContext().getLog().info("No INDs found.");
+		} else if ((message.isDependantFirst && !message.isDependantSecond) || (!message.isDependantFirst && message.isDependantSecond)){
+			this.getContext().getLog().info("1 IND found.");
+		} else {
+			this.getContext().getLog().info("2 INDs found.");
+		}
+
 		LargeMessageProxy.LargeMessage msg = new DependencyMiner.INDToMinerMessage(this.getContext().getSelf(), message.getC1TableIndex(),
 				message.getC1ColumnIndex(), message.getC2TableIndex(), message.getC2ColumnIndex(), message.isDependant(), message.taskId);
 		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, DependencyWorker.dependencyMinerLargeMessageProxy));

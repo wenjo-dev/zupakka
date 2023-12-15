@@ -67,52 +67,33 @@ public class INDFinder extends AbstractBehavior<INDFinder.Message> {
                 .build();
     }
 
-    private Behavior<INDFinder.Message> handle2(INDFinder.FindINDMessage message) {
-        double lastLogTime = System.currentTimeMillis();
-
-        boolean isDependant = true;
-        ArrayList<String> firstColumn = this.task.getC1();
-        ArrayList<String> secondColumn = this.task.getC2();
-
-        for(int i = 0; i < secondColumn.size(); i++) {
-            // log
-            if(System.currentTimeMillis() - lastLogTime >= 1000) {
-                this.getContext().getLog().info((Math.round((double)i / (double)secondColumn.size() * 10000.0) / 100.0)+"% checked");
-                lastLogTime = System.currentTimeMillis();
-            }
-
-            if(!firstColumn.contains(secondColumn.get(i))) {
-                isDependant = false;
-                break;
-            }
-        }
-        message.getWorker().tell(new DependencyWorker.INDTaskResultMessage(this.getContext().getSelf(), task.getC1TableIndex(), task.getC1ColumnIndex(),
-                task.getC2TableIndex(), task.getC2ColumnIndex(), isDependant, this.task.id));
-
-        return this;
-    }
-
     private Behavior<INDFinder.Message> handle(INDFinder.FindINDMessage message) {
-        double lastLogTime = System.currentTimeMillis();
-
-        boolean isDependant = true;
-        HashMap<String, Boolean> firstColumn = new HashMap<>();
+        boolean firstDependant = true;
+        boolean secondDependant = true;
+        HashMap<String, Boolean> mapFirst = new HashMap<>();
         for (int i = 0; i < this.task.getC1().size(); i++){
-            firstColumn.put(this.task.getC1().get(i), true);
+            mapFirst.put(this.task.getC1().get(i), true);
         }
         for (int i = 0; i < this.task.getC2().size(); i++){
-            if(System.currentTimeMillis() - lastLogTime >= 1000) {
-                this.getContext().getLog().info((Math.round((double)i / (double)this.task.getC2().size() * 10000.0) / 100.0)+"% checked");
-                lastLogTime = System.currentTimeMillis();
+            if(mapFirst.get(this.task.getC2().get(i)) == null){
+                firstDependant = false;
+                break;
             }
-            if(firstColumn.get(this.task.getC2().get(i)) == null){
-                isDependant = false;
+        }
+        mapFirst = null;
+        HashMap<String, Boolean> mapSecond = new HashMap<>();
+        for (int i = 0; i < this.task.getC2().size(); i++){
+            mapSecond.put(this.task.getC2().get(i), true);
+        }
+        for (int i = 0; i < this.task.getC1().size(); i++){
+            if(mapSecond.get(this.task.getC1().get(i)) == null){
+                secondDependant = false;
                 break;
             }
         }
 
         message.getWorker().tell(new DependencyWorker.INDTaskResultMessage(this.getContext().getSelf(), task.getC1TableIndex(), task.getC1ColumnIndex(),
-                task.getC2TableIndex(), task.getC2ColumnIndex(), isDependant, this.task.id));
+                task.getC2TableIndex(), task.getC2ColumnIndex(), firstDependant, secondDependant, this.task.id));
 
         return this;
     }
