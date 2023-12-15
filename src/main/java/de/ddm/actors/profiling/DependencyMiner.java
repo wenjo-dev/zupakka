@@ -273,54 +273,21 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		return this;
 	}
 
-	private void createPairCandidates2() {
-		for(int i = 0; i < this.headerLines.length; i++) {
-			for(int j = 0; j < this.headerLines[i].length; j++) {
-				// loop through columns of current table
-				for(int k = 0; k < this.headerLines[i].length; k++) {
-					if (k == j)
-						continue;
-					// t1, c1, t2, c2, tc1 ready, tc2 ready
-					this.pairs.add(new Integer[]{i, j, i, k, 0, 0});
-				}
-				// loop through other tables
-				for(int k = 0; k < this.headerLines.length; k++) {
-					if(k == i)
-						continue;
-					// loop through columns of other table
-					for(int l = 0; l < this.headerLines[k].length; l++) {
-						this.pairs.add(new Integer[]{i, j, k, l, 0, 0});
-					}
-				}
-			}
-		}
-	}
-
 	private void createPairCandidates(){
 		for (int i = 0; i < this.headerLines.length;i++){
 			for (int j = 0; j < this.headerLines.length; j++){
-				createPairsFromTables(i, j, true);
+				createPairsFromTables(i, j);
 			}
 		}
 	}
 
-	private void createPairsFromTables(int table1, int table2, boolean bothDirections){
+	private void createPairsFromTables(int table1, int table2){
 		for (int i = 0; i < this.headerLines[table1].length; i++){
 			for (int j = 0; j < this.headerLines[table2].length;j++){
 				if(table1 == table2 && i == j){
 					continue;
 				}
 				this.pairs.add(new Integer[]{table1, i, table2, j, 0, 0});
-			}
-		}
-		if(bothDirections){
-			for (int i = 0; i < this.headerLines[table2].length; i++){
-				for (int j = 0; j < this.headerLines[table1].length;j++){
-					if(table1 == table2 && i == j){
-						continue;
-					}
-					this.pairs.add(new Integer[]{table2, i, table1, j, 0, 0});
-				}
 			}
 		}
 	}
@@ -392,7 +359,6 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	}
 
 	private void assignTasksToWorkers(){
-		this.getContext().getLog().info(String.valueOf("BUSY TASKS: " + this.busyWorkList.size()));
 		while (!this.workList.isEmpty() && !this.idleWorkers.isEmpty()){
 			this.getContext().getLog().info("unique column tasks: "+this.workList.stream().filter(task -> task instanceof UniqueColumnTask).count() + " and " +
 					"IND tasks: "+this.workList.stream().filter(task -> task instanceof INDTask).count());
