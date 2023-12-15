@@ -66,50 +66,9 @@ public class UniqueColumnCreator extends AbstractBehavior<UniqueColumnCreator.Me
                 .build();
     }
 
-    private Behavior<UniqueColumnCreator.Message> handle2(UniqueColumnCreator.CreateUniqueColumnMessage message) {
-        double size = this.task.getData().size();
-        double redundancies = 0.0;
-        double current = 0.0;
-        double lastLogTime = System.currentTimeMillis();
-        boolean checkReached = false;
-
-        ArrayList<String> result = new ArrayList<>();
-        for (String s: this.task.getData()){
-            if(!result.contains(s))
-                result.add(s);
-            else
-                redundancies += 1;
-            current += 1;
-
-            // log
-            if(System.currentTimeMillis() - lastLogTime >= 1000) {
-                this.getContext().getLog().info("table "+this.task.getTableIndex()+", column "+this.task.getColumnIndex()+": "+ (Math.round(current / size * 10000.0) / 100.0)+"% checked - redundancy quote: "+(Math.round(redundancies / current * 10000.0) / 100.0)+"%");
-                lastLogTime = System.currentTimeMillis();
-            }
-
-            if(!checkReached && current >= 10000) {
-                checkReached = true;
-                if (redundancies / current >= SystemConfiguration.redundancyThreshold)
-                    this.getContext().getLog().info("the first 10k values contain at least 20% redundant values - continue search for uniques");
-                else {
-                    this.getContext().getLog().info("the first 10k of values contain less than 20% redundant values - aborting search for uniques");
-                    message.getWorker().tell(new DependencyWorker.UniqueColumnResultMessage(this.getContext().getSelf() , this.task.getData(), this.task.getTableIndex(),
-                            this.task.getColumnIndex(), this.task.id));
-                    return this;
-                }
-            }
-        }
-        message.getWorker().tell(new DependencyWorker.UniqueColumnResultMessage(this.getContext().getSelf(), result, this.task.getTableIndex(),
-                this.task.getColumnIndex(), this.task.id));
-
-        return this;
-    }
-
     private Behavior<UniqueColumnCreator.Message> handle(UniqueColumnCreator.CreateUniqueColumnMessage message) {
-        double size = this.task.getData().size();
         double redundancies = 0.0;
         double current = 0.0;
-        double lastLogTime = System.currentTimeMillis();
         boolean checkReached = false;
 
         HashMap<String, Boolean> map = new HashMap<>();
@@ -120,12 +79,6 @@ public class UniqueColumnCreator extends AbstractBehavior<UniqueColumnCreator.Me
                 redundancies += 1;
             }
             current += 1;
-
-            // log
-            if(System.currentTimeMillis() - lastLogTime >= 1000) {
-                this.getContext().getLog().info("table "+this.task.getTableIndex()+", column "+this.task.getColumnIndex()+": "+ (Math.round(current / size * 10000.0) / 100.0)+"% checked - redundancy quote: "+(Math.round(redundancies / current * 10000.0) / 100.0)+"%");
-                lastLogTime = System.currentTimeMillis();
-            }
 
             if(!checkReached && current >= 10000) {
                 checkReached = true;
