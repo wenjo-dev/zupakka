@@ -83,6 +83,13 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		int taskId;
 	}
 
+	@Getter
+	@NoArgsConstructor
+	@AllArgsConstructor
+	public static class ShutDownWorkerMessage implements Message {
+		private static final long serialVersionUID = -5246338806092192722L;
+	}
+
 	////////////////////////
 	// Actor Construction //
 	////////////////////////
@@ -122,6 +129,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 				.onMessage(UniqueColumnResultMessage.class, this::handle)
 				.onMessage(FindINDTaskMessage.class, this::handle)
 				.onMessage(INDTaskResultMessage.class, this::handle)
+				.onMessage(ShutDownWorkerMessage.class, this::handle)
 				.build();
 	}
 
@@ -175,6 +183,11 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		LargeMessageProxy.LargeMessage msg = new DependencyMiner.INDToMinerMessage(this.getContext().getSelf(), message.getC1TableIndex(),
 				message.getC1ColumnIndex(), message.getC2TableIndex(), message.getC2ColumnIndex(), message.isDependantFirst, message.isDependantSecond, message.taskId);
 		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(msg, DependencyWorker.dependencyMinerLargeMessageProxy));
+		return this;
+	}
+
+	private Behavior<Message> handle(ShutDownWorkerMessage message) {
+		Behaviors.stopped();
 		return this;
 	}
 }
