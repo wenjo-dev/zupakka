@@ -106,6 +106,13 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		int taskId;
 	}
 
+	@Getter
+	@NoArgsConstructor
+	@AllArgsConstructor
+	public static class ShutDownMinerMessage implements Message {
+		private static final long serialVersionUID = -5242338806092192722L;
+	}
+
 	////////////////////////
 	// Actor Construction //
 	////////////////////////
@@ -187,6 +194,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 				.onMessage(ColumnCreationMessage.class, this::handle)
 				.onMessage(UniqueColumnToMinerMessage.class, this::handle)
 				.onMessage(INDToMinerMessage.class, this::handle)
+				.onMessage(ShutDownMinerMessage.class, this::handle)
 				.onSignal(Terminated.class, this::handle)
 				.build();
 	}
@@ -393,6 +401,12 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		} else {
 			this.idleWorkers.remove(dependencyWorker);
 		}
+		this.getContext().getLog().info("TERMINATED!!");
+		return this;
+	}
+
+	private Behavior<Message> handle(ShutDownMinerMessage message) {
+		Behaviors.stopped();
 		return this;
 	}
 
