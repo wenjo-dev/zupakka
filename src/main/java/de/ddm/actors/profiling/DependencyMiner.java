@@ -342,10 +342,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	}
 
 	private void checkTransitiveINDs() {
-		Integer[] lastIND = this.allINDs.get(this.allINDs.size() - 1);
-		for(Integer[] ind : this.allINDs) {
-
-		}
+		//TODO
 	}
 
 	private Behavior<Message> handle(INDToMinerMessage message) {
@@ -370,7 +367,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 						this.inputFiles[message.getC2TableIndex()],
 						new String[]{this.headerLines[message.getC2TableIndex()][message.c2ColumnIndex]});
 				resultList.add(ind);
-				this.allINDs.add(ind);
+				this.allINDs.add(new Integer[]{message.c1TableIndex, message.c1ColumnIndex, message.c2TableIndex, message.c2ColumnIndex});
 			}
 
 			this.resultCollector.tell(new ResultCollector.ResultMessage(resultList));
