@@ -169,7 +169,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	private final ArrayList<Integer[]> pairs = new ArrayList<>();
 
 	// test
-	private final ArrayList<InclusionDependency> allINDs = new ArrayList<>();
+	private final ArrayList<Integer[]> allINDs = new ArrayList<>();
 	private int indTasks = 0;
 
 
@@ -332,6 +332,13 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		}
 	}
 
+	private void checkTransitiveINDs() {
+		Integer[] lastIND = this.allINDs.get(this.allINDs.size() - 1);
+		for(Integer[] ind : this.allINDs) {
+
+		}
+	}
+
 	private Behavior<Message> handle(INDToMinerMessage message) {
 		if(message.isDependantFirst() || message.isDependantSecond()){
 			ArrayList<InclusionDependency> resultList = new ArrayList<>();
@@ -343,7 +350,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 						this.inputFiles[message.getC1TableIndex()],
 						new String[]{this.headerLines[message.getC1TableIndex()][message.c1ColumnIndex]});
 				resultList.add(ind);
-				this.allINDs.add(ind);
+				this.allINDs.add(new Integer[]{message.c1TableIndex, message.c1ColumnIndex, message.c2TableIndex, message.c2ColumnIndex});
+				checkTransitiveINDs();
 			}
 			if (message.isDependantSecond){
 				this.getContext().getLog().info("Received IND: " + this.inputFiles[message.c2TableIndex].getName() + "." + this.headerLines[message.c2TableIndex][message.c2ColumnIndex] + " -> "
