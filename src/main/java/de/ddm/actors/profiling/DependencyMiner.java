@@ -108,7 +108,6 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 	@Getter
 	@NoArgsConstructor
-	@AllArgsConstructor
 	public static class ShutDownMinerMessage implements Message {
 		private static final long serialVersionUID = -5242338806092192722L;
 	}
@@ -178,6 +177,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	// test
 	private final ArrayList<Integer[]> allINDs = new ArrayList<>();
 	private int indTasks = 0;
+
+	private Map<Integer, WorkTask> taskIdMap = new HashMap<>();
 
 
 	////////////////////
@@ -403,13 +404,21 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	}
 
 	private Behavior<Message> handle(Terminated signal) {
+		this.getContext().getLog().info("Worker terminated. Task will be placed at the front of the work list");
 		ActorRef<DependencyWorker.Message> dependencyWorker = signal.getRef().unsafeUpcast();
 		if(this.busyWorkers.contains(dependencyWorker)){
 			this.busyWorkers.remove(dependencyWorker);
 		} else {
 			this.idleWorkers.remove(dependencyWorker);
 		}
-		this.getContext().getLog().info("TERMINATED!!");
+		int taskId = 0;
+		for (Map.Entry<Integer, ActorRef<DependencyWorker.Message>> entry : this.busyWorkList.entrySet()) {
+			if (entry.getValue().equals(dependencyWorker)){
+				taskId = entry.getKey();
+				break;
+			}
+		}
+		this.workList.add(0, this.taskIdMap.get(taskId));
 		return this;
 	}
 
@@ -427,8 +436,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			ActorRef<DependencyWorker.Message> worker = this.idleWorkers.get(0);
 			this.idleWorkers.remove(0);
 			this.busyWorkers.add(worker);
-
 			this.busyWorkList.put(task.id, worker);
+			this.taskIdMap.put(task.id, task);
 
 			int dataAmount = 0;
 			if(task.getClass().equals(UniqueColumnTask.class)){
