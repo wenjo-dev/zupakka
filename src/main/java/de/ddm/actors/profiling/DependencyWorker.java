@@ -85,7 +85,6 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 
 	@Getter
 	@NoArgsConstructor
-	@AllArgsConstructor
 	public static class ShutDownWorkerMessage implements Message {
 		private static final long serialVersionUID = -5246338806092192722L;
 	}
